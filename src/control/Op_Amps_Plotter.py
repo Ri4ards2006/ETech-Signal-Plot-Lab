@@ -1,6 +1,11 @@
+import matplotlib
+matplotlib.use('Qt5Agg') # NEU: Qt5-Backend verwenden
 import numpy as np
+# ... Rest des Skripts
 import matplotlib.pyplot as plt
 from ipywidgets import interact, FloatSlider
+
+# ... der Rest deines Codes ...
 
 def op_amp_inverter(t, Rf, Rin, Vin_amp, Vin_freq):
     """Berechnet Eingang- und Ausgangsspannung eines idealen Inverter-Schaltbilds."""
