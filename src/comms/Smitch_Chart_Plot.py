@@ -102,13 +102,16 @@ def plot_smith_chart(ax, Z0):
     ax.grid(False)
     ax.set_aspect('equal', 'box')
 
-def plot_smith_and_matching(f_min=5, f_max=20, num_f=1000, Z0=50,
+def plot_smith_and_matching(f_min=5, f_max=20, num_f=1000,
+                            Z0=50,
                             network_type='None', L_L=1e-6, C_C=1e-9,
                             L1=1e-6, L2=1e-6, C=1e-9,
                             R_ant=50, L_ant=1e-6, C_ant=1e-9, X0=0):
+    # Konvertiere num_f zu Integer (da Slider Float liefert, aber linspace Integer erwartet)
+    num_f = int(num_f)  
     f_min_hz = f_min * 1e6
     f_max_hz = f_max * 1e6
-    f = np.linspace(f_min_hz, f_max_hz, num_f)
+    f = np.linspace(f_min_hz, f_max_hz, num_f)  
     Z_ant = compute_antenna_impedance(f, R_ant, L_ant, C_ant, X0)
     gamma_ant = compute_gamma(Z_ant, Z0)
     Z_total = compute_total_impedance(f, lambda f: compute_antenna_impedance(f, R_ant, L_ant, C_ant, X0), network_type, L_L, C_C, L1, L2, C, Z0)
@@ -117,61 +120,68 @@ def plot_smith_and_matching(f_min=5, f_max=20, num_f=1000, Z0=50,
     return_loss_ant = compute_return_loss(gamma_ant)
     fig, (ax_smith, ax_rl, ax_z) = plt.subplots(1, 3, figsize=(24, 8))
     plot_smith_chart(ax_smith, Z0)
-    ax_smith.plot(gamma_ant.real, gamma_ant.imag, color='blue', linewidth=2)
-    ax_smith.plot(gamma_total.real, gamma_total.imag, color='red', linewidth=2)
-    f0_ant = 1/(2 * np.pi * np.sqrt(L_ant * C_ant)) if L_ant * C_ant > 0 else 0
-    idx_f0 = np.argmin(np.abs(f - f0_ant)) if f0_ant !=0 else 0
-    gamma_f0_total = gamma_total[idx_f0] if f0_ant !=0 else [0,0]
-    gamma_f0_ant = gamma_ant[idx_f0] if f0_ant !=0 else [0,0]
-    ax_smith.scatter(gamma_f0_total.real, gamma_f0_total.imag, color='green', s=50)
-    ax_smith.scatter(gamma_f0_ant.real, gamma_f0_ant.imag, color='blue', s=50)
-    ax_smith.text(gamma_f0_total.real, gamma_f0_total.imag, f'f0={f0_ant/1e6:.2f}MHz', color='green')
-    ax_smith.text(gamma_f0_ant.real, gamma_f0_ant.imag, f'f0={f0_ant/1e6:.2f}MHz', color='blue')
-    ax_rl.plot(f/1e6, return_loss_total, color='red', linewidth=2)
-    ax_rl.plot(f/1e6, return_loss_ant, color='blue', linestyle='--', linewidth=1)
+    ax_smith.plot(gamma_ant.real, gamma_ant.imag, color='blue', linewidth=2, label='Antenne (ohne Netzwerk)')
+    ax_smith.plot(gamma_total.real, gamma_total.imag, color='red', linewidth=2, label=f'Netzwerk Typ: {network_type}')
+    # Markiere Resonanzfrequenz (nur wenn Antenne resonanzfähig)
+    if L_ant > 0 and C_ant > 0:
+        f0_ant = 1/(2 * np.pi * np.sqrt(L_ant * C_ant)) 
+        idx_f0 = np.argmin(np.abs(f - f0_ant))
+        gamma_f0_ant = gamma_ant[idx_f0]
+        gamma_f0_total = gamma_total[idx_f0]
+        ax_smith.scatter(gamma_f0_ant.real, gamma_f0_ant.imag, color='blue', s=50)
+        ax_smith.scatter(gamma_f0_total.real, gamma_f0_total.imag, color='red', s=50)
+        ax_smith.text(gamma_f0_ant.real, gamma_f0_ant.imag, f'Antenne f0={f0_ant/1e6:.2f}MHz', color='blue')
+        ax_smith.text(gamma_f0_total.real, gamma_f0_total.imag, f'Netzwerk f0={f0_ant/1e6:.2f}MHz', color='red')
+    ax_smith.legend()
+    # Return Loss Plot
+    ax_rl.plot(f/1e6, return_loss_total, color='red', linewidth=2, label='Mit Netzwerk')
+    ax_rl.plot(f/1e6, return_loss_ant, color='blue', linestyle='--', linewidth=1, label='Ohne Netzwerk')
     ax_rl.set_xlabel('Frequenz (MHz)')
     ax_rl.set_ylabel('Return Loss (dB)')
     ax_rl.set_ylim(-60, 0)
     ax_rl.grid(True, linestyle='--')
-    min_rl_total = np.min(return_loss_total)
-    f_min_rl_total = f[np.argmin(return_loss_total)] / 1e6
-    avg_rl_total = np.mean(return_loss_total)
-    min_rl_ant = np.min(return_loss_ant)
-    f_min_rl_ant = f[np.argmin(return_loss_ant)] / 1e6
-    avg_rl_ant = np.mean(return_loss_ant)
-    ax_rl.text(0.05, 0.95, f'Min RL (Netzwerk): {min_rl_total:.2f}dB\nbei f: {f_min_rl_total:.2f}MHz\nDurchschnitt: {avg_rl_total:.2f}dB',
-              transform=ax_rl.transAxes, bbox=dict(facecolor='white', alpha=0.8))
-    ax_rl.text(0.05, 0.8, f'Min RL (Antenne): {min_rl_ant:.2f}dB\nbei f: {f_min_rl_ant:.2f}MHz\nDurchschnitt: {avg_rl_ant:.2f}dB',
-              transform=ax_rl.transAxes, bbox=dict(facecolor='white', alpha=0.8))
+    # Markiere minimales RL
+    min_rl_total_idx = np.argmin(return_loss_total)
+    min_rl_total = return_loss_total[min_rl_total_idx]
+    f_min_rl_total = f[min_rl_total_idx]/1e6
+    ax_rl.scatter(f_min_rl_total, min_rl_total, color='green', s=50)
+    ax_rl.text(f_min_rl_total, min_rl_total, f'Min RL (Netzwerk): {min_rl_total:.2f}dB\nbei f: {f_min_rl_total:.2f}MHz', color='green')
+    min_rl_ant_idx = np.argmin(return_loss_ant)
+    min_rl_ant = return_loss_ant[min_rl_ant_idx]
+    f_min_rl_ant = f[min_rl_ant_idx]/1e6
+    ax_rl.scatter(f_min_rl_ant, min_rl_ant, color='orange', s=50)
+    ax_rl.text(f_min_rl_ant, min_rl_ant, f'Min RL (Antenne): {min_rl_ant:.2f}dB\nbei f: {f_min_rl_ant:.2f}MHz', color='orange')
+    ax_rl.legend()
+    # Impedanzkomponenten Plot
     Z_total_norm = Z_total / Z0
     Z_ant_norm = Z_ant / Z0
-    ax_z.plot(f/1e6, Z_total_norm.real, color='green', linewidth=2)
-    ax_z.plot(f/1e6, Z_total_norm.imag, color='purple', linewidth=2)
-    ax_z.plot(f/1e6, Z_ant_norm.real, color='blue', linestyle='--', linewidth=1)
-    ax_z.plot(f/1e6, Z_ant_norm.imag, color='red', linestyle='--', linewidth=1)
+    ax_z.plot(f/1e6, Z_total_norm.real, color='green', linewidth=2, label='Realteil (Netzwerk)')
+    ax_z.plot(f/1e6, Z_total_norm.imag, color='purple', linewidth=2, label='Imaginärteil (Netzwerk)')
+    ax_z.plot(f/1e6, Z_ant_norm.real, color='blue', linestyle='--', linewidth=1, label='Realteil (Antenne)')
+    ax_z.plot(f/1e6, Z_ant_norm.imag, color='red', linestyle='--', linewidth=1, label='Imaginärteil (Antenne)')
     ax_z.set_xlabel('Frequenz (MHz)')
     ax_z.set_ylabel('Normierte Impedanz (Z/Z0)')
     ax_z.grid(True, linestyle='--')
-    ax_z.legend(['Realteil (Netzwerk)', 'Imaginärteil (Netzwerk)', 'Realteil (Antenne)', 'Imaginärteil (Antenne)'])
-    ax_smith.legend(['Antenne', network_type])
+    ax_z.legend()
     plt.tight_layout()
     plt.show()
 
+# Interaktive UI-Eingabe (Slider und Dropdown)
 interact(plot_smith_and_matching,
-         f_min=FloatSlider(min=1, max=100, step=1, value=5, description='f_min (MHz)'),
-         f_max=FloatSlider(min=1, max=100, step=1, value=20, description='f_max (MHz)'),
+         f_min=FloatSlider(min=1, max=100, step=0.5, value=5, description='f_min (MHz)'),
+         f_max=FloatSlider(min=1, max=100, step=0.5, value=20, description='f_max (MHz)'),
          num_f=FloatSlider(min=100, max=2000, step=100, value=1000, description='Anz. Punkte'),
          Z0=FloatSlider(min=25, max=100, step=5, value=50, description='Z0 (Ω)'),
          network_type=Dropdown(options=['None', 'L-Netz (Serie L)', 'C-Netz (Parallels C)',
                                         'Series L + Shunt C', 'Shunt L + Series C',
                                         'Pi Network (L1, L2, C)', 'T Network (L1, L2, C)'],
                                value='None', description='Netzwerk Typ'),
-         L_L=FloatSlider(min=1e-9, max=1e-5, step=1e-7, value=1e-6, description='L_L (H)'),
-         C_C=FloatSlider(min=1e-12, max=1e-8, step=1e-10, value=1e-9, description='C_C (F)'),
-         L1=FloatSlider(min=1e-9, max=1e-5, step=1e-7, value=1e-6, description='L1 (H)'),
-         L2=FloatSlider(min=1e-9, max=1e-5, step=1e-7, value=1e-6, description='L2 (H)'),
-         C=FloatSlider(min=1e-12, max=1e-8, step=1e-10, value=1e-9, description='C (F)'),
+         L_L=FloatSlider(min=0, max=1e-5, step=1e-7, value=1e-6, description='L_L (H)'),
+         C_C=FloatSlider(min=0, max=1e-8, step=1e-10, value=1e-9, description='C_C (F)'),
+         L1=FloatSlider(min=0, max=1e-5, step=1e-7, value=1e-6, description='L1 (H)'),
+         L2=FloatSlider(min=0, max=1e-5, step=1e-7, value=1e-6, description='L2 (H)'),
+         C=FloatSlider(min=0, max=1e-8, step=1e-10, value=1e-9, description='C (F)'),
          R_ant=FloatSlider(min=10, max=100, step=5, value=50, description='R_ant (Ω)'),
-         L_ant=FloatSlider(min=1e-9, max=1e-5, step=1e-7, value=1e-6, description='L_ant (H)'),
-         C_ant=FloatSlider(min=1e-12, max=1e-8, step=1e-10, value=1e-9, description='C_ant (F)'),
+         L_ant=FloatSlider(min=0, max=1e-5, step=1e-7, value=1e-6, description='L_ant (H)'),
+         C_ant=FloatSlider(min=0, max=1e-8, step=1e-10, value=1e-9, description='C_ant (F)'),
          X0=FloatSlider(min=-100, max=100, step=1, value=0, description='X0 (Ω)'));
