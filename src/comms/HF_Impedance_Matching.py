@@ -464,3 +464,4 @@ interact(
     C_ant=FloatSlider(min=0, max=1e-8, step=1e-10, value=1e-9, description='Antenna C (F)'),
     X0=FloatSlider(min=-100, max=100, step=1, value=0, description='Parasitic X0 (Ω)')
 );
+#  The Plotting graphs look good yeah!!
