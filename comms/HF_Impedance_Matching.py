@@ -16,9 +16,9 @@ Requirements:
 - Python 3.10+
 - numpy, matplotlib, ipywidgets (install via pip)
 
-Author: [Your Name]
-Date: [Date]
-Copyright: [Your Copyright Notice]
+Author: Richard Zuikov
+Date: 24.11.2025
+Copyright: Just Enjoy the Toolkit
 """
 
 import numpy as np
