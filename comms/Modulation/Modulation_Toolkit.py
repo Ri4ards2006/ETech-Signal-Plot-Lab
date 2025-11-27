@@ -30,10 +30,22 @@ def generate_signal(t, signal_type, freq_signal=1000, amplitude=1.0):
         return amplitude * np.sin(2 * np.pi * freq_signal * t)
     elif signal_type == 'binary':
         # Binärsequenz mit Bitrate = freq_signal (bps)
-        num_bits = int(freq_signal * DURATION)
+        bitrate = freq_signal  # bps
+        if bitrate <= 0:
+            return np.zeros_like(t)
+        bit_duration = 1 / bitrate
+        num_bits = int(DURATION * bitrate)
+        if num_bits == 0:
+            return np.zeros_like(t)
+        # Zeitpunkte der Bit-Starts (s)
+        bit_start_times = np.linspace(0, DURATION, num_bits, endpoint=False)
+        # Zufällige Bits (0 oder 1)
         bits = np.random.randint(0, 2, num_bits)
         # Konvertiere zu Bipolar (0→amplitude, 1→-amplitude)
-        return np.where(bits == 1, -amplitude, amplitude)
+        s_bits = np.where(bits == 1, -amplitude, amplitude)
+        # Interpoliere s_bits zu Zeitvektor t
+        s = np.interp(t, bit_start_times, s_bits)
+        return s
     else:
         return np.zeros_like(t)
 
@@ -74,7 +86,7 @@ def demodulate_fm(modulated_signal, carrier_freq, sample_rate):
     freq_deviation -= np.mean(freq_deviation)
     return freq_deviation
 
-def demodulate_digital(modulated_signal, carrier_freq, sample_rate, symbol_rate, t, amplitude_carrier, amplitude_signal):
+def demodulate_digital(modulated_signal, carrier_freq, sample_rate, symbol_rate, t, amplitude_carrier, amplitude_signal, modulation_type):
     """Demodulation für digitale Signale (BPSK/QPSK) inkl. I/Q-Kanal-Bearbeitung"""
     # I-Kanal: Demodulation mit cos(2πf_c t), LPF
     i_demod = modulated_signal * np.cos(2 * np.pi * carrier_freq * t)
@@ -88,8 +100,10 @@ def demodulate_digital(modulated_signal, carrier_freq, sample_rate, symbol_rate,
     filtered_i = filtfilt(b, a, i_demod)
     filtered_q = filtfilt(b, a, q_demod)
     
+    # Zeitpunkte innerhalb eines Symbols (0 bis dt_symbol)
     # Sample an Symbolzeiten (jede 1/symbol_rate)
     symbol_times = np.arange(0, DURATION, 1/symbol_rate)
+    # Interpolate filtered_i and filtered_q to symbol_times
     samples_i = np.interp(symbol_times, t, filtered_i)
     samples_q = np.interp(symbol_times, t, filtered_q)
     
@@ -99,38 +113,50 @@ def demodulate_digital(modulated_signal, carrier_freq, sample_rate, symbol_rate,
     # Bitrekuperation für BPSK/QPSK via naivem Min-Distance-Algorithmus
     bits_demod = []
     for i in range(len(samples_i)):
-        # Akteure I/Q-Werte
         i_val = samples_i[i]
         q_val = samples_q[i]
         
-        # Ideal Symbole (I, Q) mit erwarteter Amplitude
-        ideal_symbols = [
-            (expected_amp, 0),    # (0,0) → BPSK: 1, QPSK: 1
-            (0, expected_amp),   # (0,1) → QPSK: j
-            (-expected_amp, 0),  # (1,0) → BPSK: -1, QPSK: -1
-            (0, -expected_amp)   # (1,1) → QPSK: -j
-        ]
-        
-        # Quadratischer Abstand zu jedem Ideal-Symbol
-        d_sq = [
-            (i_val - sym_i)**2 + (q_val - sym_q)**2 
-            for sym_i, sym_q in ideal_symbols
-        ]
-        min_idx = np.argmin(d_sq)
-        
-        # Mappe Index zu Bits (b0, b1)
-        if min_idx == 0:
-            b0, b1 = 0, 0
-        elif min_idx == 1:
-            b0, b1 = 0, 1
-        elif min_idx == 2:
-            b0, b1 = 1, 0
-        else:  # min_idx ==3
-            b0, b1 = 1, 1
-        
-        bits_demod.extend([b0, b1])  # Füge beide Bits hinzu (auch für BPSK)
+        if modulation_type == 'BPSK':
+            # Ideal Symbole für BPSK: (expected_amp, 0) und (-expected_amp, 0)
+            ideal_symbols = [
+                (expected_amp, 0),    # Bit 0
+                (-expected_amp, 0)   # Bit 1
+            ]
+            # Berechne quadratischen Abstand zu jedem Ideal-Symbol
+            d_sq = [
+                (i_val - sym_i)**2 + (q_val - sym_q)**2 
+                for sym_i, sym_q in ideal_symbols
+            ]
+            min_idx = np.argmin(d_sq)
+            # Mappe Index zu Bit
+            bit = 0 if min_idx == 0 else 1
+            bits_demod.append(bit)
+        else:  # QPSK
+            # Ideal Symbole (I, Q) mit erwarteter Amplitude
+            ideal_symbols = [
+                (expected_amp, 0),    # (0,0)
+                (0, expected_amp),   # (0,1)
+                (-expected_amp, 0),  # (1,0)
+                (0, -expected_amp)   # (1,1)
+            ]
+            # Quadratischer Abstand zu jedem Ideal-Symbol
+            d_sq = [
+                (i_val - sym_i)**2 + (q_val - sym_q)**2 
+                for sym_i, sym_q in ideal_symbols
+            ]
+            min_idx = np.argmin(d_sq)
+            # Mappe Index zu Bits (b0, b1)
+            if min_idx == 0:
+                b0, b1 = 0, 0
+            elif min_idx == 1:
+                b0, b1 = 0, 1
+            elif min_idx == 2:
+                b0, b1 = 1, 0
+            else:  # min_idx ==3
+                b0, b1 = 1, 1
+            bits_demod.extend([b0, b1])  # Füge beide Bits hinzu (nur für QPSK)
     
-    return np.array(bits_demod), samples_i, samples_q
+    return np.array(bits_demod), samples_i, samples_q, expected_amp
 
 def plot_eye_diagram(ax, samples_i, samples_q, symbol_rate, modulation_type):
     """Eye-Diagramm für digitale Signale (BPSK/QPSK)"""
@@ -158,21 +184,28 @@ def plot_eye_diagram(ax, samples_i, samples_q, symbol_rate, modulation_type):
         ax.set_xlim(0, dt_symbol*2)
     
     # Plotte I-Kanal
-    ax.plot(symbol_t, samples_i[:num_samples_per_symbol], 'b', alpha=0.1)
+    if modulation_type == 'BPSK':
+        ax.plot(symbol_t, samples_i[:num_samples_per_symbol], 'b', alpha=0.1)
     ax.set_xlabel('Zeit innerhalb des Symbols (s)')
     ax.set_ylabel('Amplitude')
     ax.grid(True, linestyle='--')
-    ax.set_xlim(0, dt_symbol)
+    if modulation_type == 'BPSK':
+        ax.set_xlim(0, dt_symbol)
 
 def plot_spectrum(ax, signal, sample_rate):
     """Frequenzgang (FFT) des Signals"""
     ax.clear()
     n = len(signal)
+    if n == 0:
+        return
     freq = np.fft.fftfreq(n, 1/sample_rate)[:n//2]  # positive Frequenzen
     fft_vals = np.abs(np.fft.fft(signal))[:n//2]
     # Normalisiere FFT auf Max-Amplitude
-    fft_vals = fft_vals / np.max(fft_vals) * np.max(np.abs(signal))
-    ax.plot(freq, 20 * np.log10(fft_vals + 1e-10), color='r')  # dB-Skala
+    if np.max(fft_vals) == 0:
+        fft_vals_normalized = fft_vals
+    else:
+        fft_vals_normalized = fft_vals / np.max(fft_vals) * np.max(np.abs(signal))
+    ax.plot(freq, 20 * np.log10(fft_vals_normalized + 1e-10), color='r')  # dB-Skala
     ax.set_title('Spektrum (FFT)')
     ax.set_xlabel('Frequenz (Hz)')
     ax.set_ylabel('Amplitude (dB)')
@@ -181,7 +214,7 @@ def plot_spectrum(ax, signal, sample_rate):
 
 def play_audio(signal, sample_rate):
     """Optional: Audio-Vorschau des Signals (mit SoundDevice)"""
-    if not np.isnan(signal).any():
+    if not np.isnan(signal).any() and len(signal) > 0:
         sd.play(signal, sample_rate, blocking=True)
 
 # --- Interaktive Simulation ---
@@ -210,35 +243,48 @@ def modulation_toolkit(
         carrier = amplitude_carrier * np.sin(2 * np.pi * carrier_freq * t)
     
     # 3. Modulieren
+    s_mod = np.zeros_like(t)  # Fallback
+    R_b = None
+    bits = None
+    s_symbols = None
+    symbols = None
+    pulse_length = None
+    baseband = None
+    
     if modulation_type == 'AM':
         # AM-DSB: s_mod = (1 + m*s/A_s) * carrier (m=Modulationsindex)
         m = modulation_index
-        s_mod = (1 + m * s / (amplitude_signal + 1e-10)) * carrier  # +1e-10 vermeidet /0
+        # Vermeide Division durch 0 (amplitude_signal könnte 0 sein, aber Widget min 0.1)
+        s_mod = (1 + m * s / (amplitude_signal + 1e-10)) * carrier 
     elif modulation_type == 'FM':
         # FM: Δf = β*s (Frequenzabweichung), Phase=∫Δf dt
         beta = modulation_index  # Modulationsindex β
         delta_f = beta * s
-        phase = 2 * np.pi * np.cumsum(delta_f) * (DURATION / len(delta_f))  # Integriere über Zeit
+        # Integriere delta_f über Zeit (korrekte Phase-Berechnung)
+        dt = t[1] - t[0] if len(t) > 1 else 1.0
+        phase = 2 * np.pi * np.cumsum(delta_f) * dt
         s_mod = amplitude_carrier * np.sin(2 * np.pi * carrier_freq * t + phase)
     elif modulation_type == 'BPSK':
         # BPSK: 1 Bit/Symbol, I-Kanal mit Bipolar-Signal
-        # Bitrate R_b = symbol_rate (1 Bit/Symbol)
-        R_b = symbol_rate  # Bitrate
+        R_b = symbol_rate  # Bitrate (1 Bit/Symbol)
         num_bits = int(R_b * DURATION)
-        # Generiere Bipolar-Signal (direkt, da generate_signal für Binär bereits verwendet)
         bits = np.random.randint(0, 2, num_bits)
         s_symbols = np.where(bits == 1, amplitude_signal, -amplitude_signal)
-        # Pulse-Länge (Samples pro Symbol)
         pulse_length = int(SAMPLE_RATE / symbol_rate)
         # Upsample: jedes Symbol pulse_length-mal wiederholen
-        baseband = np.repeat(s_symbols, pulse_length)
-        baseband = baseband[:len(t)]  # Trim to t-Länge
+        baseband_repeated = np.repeat(s_symbols, pulse_length)
+        # Längenadjustierung auf t-Länge
+        if len(baseband_repeated) < len(t):
+            pad_length = len(t) - len(baseband_repeated)
+            baseband = np.concatenate([baseband_repeated, np.repeat(s_symbols[-1], pad_length)])
+        else:
+            baseband = baseband_repeated[:len(t)]
         s_mod = baseband * carrier  # Moduliere mit Träger (cos)
     elif modulation_type == 'QPSK':
         # QPSK: 2 Bits/Symbol, I/Q-Kanäle mit Symbolen
-        # Bitrate R_b = 2 * symbol_rate
-        R_b = 2 * symbol_rate
+        R_b = 2 * symbol_rate  # Bitrate (2 Bits/Symbol)
         num_bits = int(R_b * DURATION)
+        # Generiere Bits
         bits = np.random.randint(0, 2, num_bits)
         # Padd mit 0, falls ungerade Anzahl Bits
         if num_bits % 2 != 0:
@@ -259,14 +305,20 @@ def modulation_toolkit(
                 sym = -1j
             symbols.append(sym * amplitude_signal)  # Skalieren mit Signal-Amplitude
         symbols = np.array(symbols)
-        # Pulse-Länge (Samples pro Symbol)
         pulse_length = int(SAMPLE_RATE / symbol_rate)
         # Upsample I und Q-Komponenten
         baseband_i = np.repeat(symbols.real, pulse_length)
-        baseband_q = np.repeat(symbols.imag, pulse_length)
-        # Trim to t-Länge
         baseband_i = baseband_i[:len(t)]
+        # Längenadjustierung I-Kanal
+        if len(baseband_i) < len(t):
+            pad_length = len(t) - len(baseband_i)
+            baseband_i = np.concatenate([baseband_i, np.repeat(baseband_i[-1], pad_length)])
+        baseband_q = np.repeat(symbols.imag, pulse_length)
         baseband_q = baseband_q[:len(t)]
+        # Längenadjustierung Q-Kanal
+        if len(baseband_q) < len(t):
+            pad_length = len(t) - len(baseband_q)
+            baseband_q = np.concatenate([baseband_q, np.repeat(baseband_q[-1], pad_length)])
         # Moduliere I und Q mit Träger (cos/sin)
         carrier_i = amplitude_carrier * np.cos(2 * np.pi * carrier_freq * t)
         carrier_q = amplitude_carrier * np.sin(2 * np.pi * carrier_freq * t)
@@ -274,37 +326,51 @@ def modulation_toolkit(
         s_mod_q = baseband_q * carrier_q
         s_mod = s_mod_i + s_mod_q  # Summe I/Q
     else:
-        s_mod = carrier  # Fallback
+        s_mod = carrier  # Fallback (keine Modulation)
     
     # 4. Rauschen hinzufügen
     s_mod_noisy = add_awgn(s_mod, snr_dB)
     
     # 5. Demodulieren
+    s_demod = np.zeros_like(t)
+    samples_i = np.zeros_like(t)
+    samples_q = np.zeros_like(t)
+    expected_amp = 0.0
     if modulation_type == 'AM':
-        s_demod = demodulate_am(s_mod_noisy, carrier_freq, SAMPLE_RATE)
-        # Korrektur: AM-Demodulation liefert Baseband-Amplitude, nicht original signal
-        s_demod = s_demod / np.max(s_demod) * amplitude_signal  # Skalieren auf Original-Amplitude
+        s_demod_am = demodulate_am(s_mod_noisy, carrier_freq, SAMPLE_RATE)
+        # Skalieren auf Original-Amplitude
+        if np.max(s_demod_am) == 0:
+            s_demod = s_demod_am
+        else:
+            s_demod = s_demod_am / np.max(s_demod_am) * amplitude_signal
     elif modulation_type == 'FM':
-        s_demod = demodulate_fm(s_mod_noisy, carrier_freq, SAMPLE_RATE)
-        # FM-Demodulation liefert Frequenzabweichung → konvertiere zu Originalsignal
-        s_demod = s_demod / np.max(np.abs(s_demod)) * amplitude_signal  # Skalieren
-    else:  #_digitale (BPSK/QPSK)
-        # Demoduliere und erhält I/Q-Samples + Bits
-        bits_demod, samples_i, samples_q = demodulate_digital(
+        s_demod_fm = demodulate_fm(s_mod_noisy, carrier_freq, SAMPLE_RATE)
+        # Skalieren auf Original-Amplitude
+        if np.max(np.abs(s_demod_fm)) == 0:
+            s_demod_scaled = s_demod_fm
+        else:
+            s_demod_scaled = s_demod_fm / np.max(np.abs(s_demod_fm)) * amplitude_signal
+        s_demod = s_demod_scaled
+        # Behandlung von Längenmismatch (np.diff reduziert Länge um 1)
+        t_demod = t[1:] if len(s_demod) < len(t) else t
+    else:  # Digitale Modulation (BPSK/QPSK)
+        # Demoduliere und erhält I/Q-Samples + Bits + expected_amp
+        bits_demod, samples_i, samples_q, expected_amp = demodulate_digital(
             s_mod_noisy, carrier_freq, SAMPLE_RATE, symbol_rate, t, 
-            amplitude_carrier, amplitude_signal
+            amplitude_carrier, amplitude_signal, modulation_type
         )
-        # Extrahiere I-Kanal-Samples für BPSK oder kombiniere für QPSK
         if modulation_type == 'BPSK':
             s_demod = samples_i
-            s_baseband = np.repeat(s_symbols, pulse_length)[:len(bits_demod)]  # Original Baseband für Plot
+            # Generiere Original Baseband für Plot (symbols repeated und trimmed)
+            baseband_repeated = np.repeat(s_symbols, pulse_length)
+            s_baseband = baseband_repeated[:len(bits_demod)]
         else:  # QPSK
             s_demod = bits_demod
-            # Original Bits (ohne Padding) für Plot
-            s_baseband = bits[:len(bits_demod)]
-        # Skalieren der Samples (optional, für bessere Sichtbarkeit)
-        samples_i_scaled = samples_i / expected_amp * amplitude_signal if (modulation_type == 'QPSK' and expected_amp !=0) else samples_i
-        # (expected_amp wird in demodulate_digital verwendet, aber hier nicht definiert → adjustiere)
+            # Original Bits (ohne Padding) für Plot (falls padded, entferne Padding)
+            if len(bits) > len(bits_demod):
+                s_baseband = bits[:-1]
+            else:
+                s_baseband = bits[:len(bits_demod)]
     
     # --- Plots ---
     plt.close('all')  # Alte Plots löschen
@@ -331,8 +397,13 @@ def modulation_toolkit(
     # Plot 4: Demoduliertes Signal / Eye-Diagramm
     if modulation_type in ['AM', 'FM']:
         # Analog-Demodulation
-        ax4.plot(t, s_demod, color='m', lw=1.5, label='Demoduliertes Signal')
-        ax4.plot(t, s, color='b', lw=0.8, alpha=0.3, label='Originalsignal')
+        if modulation_type == 'FM':
+            # FM hat Längenmismatch (s_demod ist kürzer als t)
+            ax4.plot(t_demod, s_demod, color='m', lw=1.5, label='Demoduliertes Signal')
+            ax4.plot(t, s, color='b', lw=0.8, alpha=0.3, label='Originalsignal')
+        else:
+            ax4.plot(t, s_demod, color='m', lw=1.5, label='Demoduliertes Signal')
+            ax4.plot(t, s, color='b', lw=0.8, alpha=0.3, label='Originalsignal')
         ax4.set_ylabel('Amplitude')
         ax4.set_title(f'Demodulation ({modulation_type})')
         ax4.legend()
@@ -340,11 +411,20 @@ def modulation_toolkit(
     else:
         # Digitale-Demodulation → Eye-Diagramm
         plot_eye_diagram(ax4, samples_i, samples_q, symbol_rate, modulation_type)
-        # Optional: Plot originaler Baseband-Bits (ohne Rauschen)
+        # Optional: Plot originaler Baseband (ohne Rauschen)
         if signal_type == 'binary':
+            # Generiere Zeitvektor für Baseband-Diagramm
             baseband_t = np.linspace(0, DURATION, len(s_baseband))
-            ax4.plot(baseband_t, s_baseband * amplitude_signal, 'k--', lw=0.5, 
-                     label='Original Baseband', alpha=0.5)
+            # Plotte Original Baseband (je nach Modulationstyp)
+            if modulation_type == 'BPSK':
+                # BPSK: s_baseband sind die upsampled Symbols (bereits bipolar)
+                ax4.plot(baseband_t, s_baseband, 'k--', lw=0.5, 
+                         label='Original Baseband', alpha=0.5)
+            else:  # QPSK
+                # QPSK: s_baseband sind die Bits (0/1), skalieren zu bipolar
+                s_baseband_bipolar = np.where(s_baseband == 1, -amplitude_signal, amplitude_signal)
+                ax4.plot(baseband_t, s_baseband_bipolar, 'k--', lw=0.5, 
+                         label='Original Baseband', alpha=0.5)
             ax4.legend()
     ax4.set_xlabel('Zeit (s)')
     ax4.grid(True, linestyle='--')
@@ -360,7 +440,6 @@ def modulation_toolkit(
 # --- Widgets definieren ---
 # Checkbox für Audio-Vorschau
 play_audio_check = Checkbox(value=False, description='Play Audio')
-
 interact(
     modulation_toolkit,
     modulation_type=Dropdown(
@@ -399,7 +478,7 @@ interact(
     ),
     symbol_rate=IntSlider(
         min=100, max=1e4, step=100, 
-        value=5000, description='Symbolrate (Hz):'  # Sichtbar für digitale Typen
+        value=5000, description='Symbolrate (Hz):'  # Sichtbar für digitale Modulationen
     ),
     play_audio_check=play_audio_check
 );
