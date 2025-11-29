@@ -93,4 +93,5 @@ plt.legend(loc='upper left', fontsize=10)
 plt.xlim(0, 5 * tau)  # Zeitachse begrenzen (keine leeren Bereiche)
 plt.ylim(0, 1.1)  # Spannungsbereich etwas übersichtlicher
 plt.tight_layout()
-plt.show()
+plt.show() 
+// small rework

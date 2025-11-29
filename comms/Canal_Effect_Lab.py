@@ -169,7 +169,7 @@ BER = np.mean(received_bits != bits)
 print(f"BER für SNR={SNR_dB} dB: {BER:.4f}")
 
 # --------------------------
-# 8. Visualisierung der Ergebnisse
+#yaaaaaaaaaaaaaaaaaaaaaaaaaqw 8. Visualisierung der Ergebnisse
 # --------------------------
 
 def plot_time_domain(signal, t, title, label='Signal'):
