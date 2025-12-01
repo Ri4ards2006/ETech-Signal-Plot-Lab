@@ -94,4 +94,4 @@ plt.xlim(0, 5 * tau)  # Zeitachse begrenzen (keine leeren Bereiche)
 plt.ylim(0, 1.1)  # Spannungsbereich etwas übersichtlicher
 plt.tight_layout()
 plt.show() 
-// small reworks
+// small reworkss
