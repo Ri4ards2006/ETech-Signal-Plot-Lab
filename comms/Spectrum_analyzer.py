@@ -1,471 +1,279 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
-import tkinter as tk
-from tkinter import ttk, filedialog
-import matplotlib.backends.backend_tkagg as tkagg
+from ipywidgets import interact, FloatSlider, IntSlider, Dropdown
 
-class SpectrumAnalyzerGUI:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Spectrum Analyzer Emulator")
-        
-        # Signalvariablen
-        self.signal = None
-        self.Fs = None  # Abtastrate
-        self.t = None   # Zeitachse
-        self.freqs_positive = None  # Positive Frequenzen (FFT)
-        self.db_magnitude_positive = None  # dB-Amplitude (FFT)
-        self.RBW = None  # Resolution Bandwidth
-        self.markers = []  # Markierungen (Frequenz, dB)
-        
-        # Statusvariablen
-        self.status_var = tk.StringVar()
-        self.current_signal_type = 'Sinus'
+# =================================================================
+# 1. Impedanz-Berechnungen & Transformationen
+# =================================================================
+def compute_antenna_impedance(f, R_ant, L_ant, C_ant, X0):
+    """
+    Berechne die Eingangsimpedanz einer Antenne (ohne Netzwerk)
+    Args:
+        f (np.ndarray): Frequenz (Hz)
+        R_ant (float): Antennenwiderstand (Ω)
+        L_ant (float): Serienduktivität der Antenne (H)
+        C_ant (float): Parallelkapazität der Antenne (F)
+        X0 (float): Zusätzliche parasitäre Reaktanz (Ω)
+    Returns:
+        np.ndarray: Komplexe Impedanz Z_ant (Ω)
+    """
+    omega = 2 * np.pi * f
+    X_L = omega * L_ant
+    X_C = -1/(omega * C_ant) if C_ant > 1e-15 else 0  # Vermeide Division durch 0
+    return R_ant + 1j * (X0 + X_L + X_C)
 
-        # GUI-Elemente erstellen
-        self.create_widgets()
-        self.update_parameters()
+def series_L_transform(Z_in, f, L_L):
+    """Transformiere Impedanz mit Serieninduktivität (L)"""
+    omega = 2 * np.pi * f
+    return Z_in + 1j * omega * L_L
 
-    def create_widgets(self):
-        # Parameter Frame
-        self.params_frame = ttk.Frame(self.root)
-        self.params_frame.pack(padx=10, pady=10, fill='x')
+def shunt_C_transform(Z_in, f, C_C):
+    """Transformiere Impedanz mit Parallelkapazität (C)"""
+    if C_C <= 1e-15:
+        return Z_in  # Kein Effekt, wenn C ≈ 0
+    omega = 2 * np.pi * f
+    Z_C = 1/(1j * omega * C_C)
+    return (Z_in * Z_C) / (Z_in + Z_C)  # Z_in || Z_C
 
-        # Signal-Typ Auswahl
-        self.signal_type_label = ttk.Label(self.params_frame, text="Signal Typ:")
-        self.signal_type_label.pack(side='left')
-        
-        self.signal_type = ttk.Combobox(self.params_frame, 
-                                      values=['Sinus', 'FM-Ton', 'LTE-Frame', 'WAV-File'], 
-                                      state='readonly')
-        self.signal_type.pack(side='left', padx=5)
-        self.signal_type.bind('<<ComboboxSelected>>', self.update_parameters)
+def series_L_shunt_C_transform(Z_in, f, L_L, C_C):
+    """Kombinierte Transformation: Serien L + Parallel C"""
+    Z_series_L = series_L_transform(Z_in, f, L_L)
+    return shunt_C_transform(Z_series_L, f, C_C)
 
-        # Dynamischer Parameterbereich
-        self.dynamic_params_frame = ttk.Frame(self.params_frame)
-        self.dynamic_params_frame.pack(side='left', padx=10, fill='x', expand=True)
+def shunt_L_series_C_transform(Z_in, f, L_L, C_C):
+    """Transformation: Paralleler L + Seriener C"""
+    if L_L <= 1e-15:
+        return Z_in  # Paralleler L ignoriert
+    omega = 2 * np.pi * f
+    Z_L = 1j * omega * L_L
+    Z_parallel_L = (Z_in * Z_L) / (Z_in + Z_L)  # Z_in || L_L
+    
+    if C_C <= 1e-15:
+        return Z_parallel_L  # Seriener C ignoriert
+    Z_C = 1/(1j * omega * C_C)
+    return Z_parallel_L + Z_C  # Serie mit C
 
-        # Buttons Frame
-        self.buttons_frame = ttk.Frame(self.root)
-        self.buttons_frame.pack(padx=10, pady=5, fill='x')
+def pi_network_transform(Z_in, f, L1, L2, C):
+    """π-Netzwerk-Transformation (L1, L2 seriend; C parallel)"""
+    omega = 2 * np.pi * f
+    Z_L1 = 1j * omega * L1
+    Z_L2 = 1j * omega * L2
+    
+    # Kapazität C in Ohm konvertieren (oder unendlich, wenn C ≈ 0)
+    if C <= 1e-15:
+        Z_C = np.inf
+    else:
+        Z_C = 1/(1j * omega * C)
+    
+    # L2 || C
+    Z_parallel_L2C = (Z_L2 * Z_C) / (Z_L2 + Z_C) if Z_C != np.inf else Z_L2
+    return Z_in + Z_L1 + Z_parallel_L2C  # Z_in + L1 + (L2 || C)
 
-        self.generate_btn = ttk.Button(self.buttons_frame, 
-                                      text="Generate/Load Signal", 
-                                      command=self.generate_or_load_signal)
-        self.generate_btn.pack(side='left', padx=5)
+def t_network_transform(Z_in, f, L1, L2, C):
+    """T-Netzwerk-Transformation (L1 parallel, C seriend, L2 parallel)"""
+    omega = 2 * np.pi * f
+    Z_L1 = 1j * omega * L1 if L1 > 1e-15 else np.inf
+    Z_L2 = 1j * omega * L2 if L2 > 1e-15 else np.inf
+    
+    # Z_in || L1
+    Z_parallel1 = (Z_in * Z_L1) / (Z_in + Z_L1) if Z_L1 != np.inf else Z_in
+    
+    # + Serie C
+    if C <= 1e-15:
+        Z_series = Z_parallel1
+    else:
+        Z_C = 1/(1j * omega * C)
+        Z_series = Z_parallel1 + Z_C
+    
+    # || L2
+    Z_total = (Z_series * Z_L2) / (Z_series + Z_L2) if Z_L2 != np.inf else Z_series
+    return Z_total
 
-        self.plot_btn = ttk.Button(self.buttons_frame, 
-                                  text="Plot Spectrum", 
-                                  command=self.plot_spectrum)
-        self.plot_btn.pack(side='left', padx=5)
+# =================================================================
+# 2. Reflexionskoeffizient & Return Loss
+# =================================================================
+def compute_gamma(Z_total, Z0):
+    """Rechnet Reflexionskoeffizient Γ = (Z/Z0 - 1)/(Z/Z0 + 1)"""
+    Z_norm = Z_total / Z0
+    return (Z_norm - 1) / (Z_norm + 1)
 
-        # Zoom-Einstellungen
-        self.zoom_frame = ttk.Frame(self.buttons_frame)
-        self.zoom_frame.pack(side='left', padx=10)
+def compute_return_loss(gamma):
+    """Konvertiert Γ zu Return Loss (dB), clippt extreme Werte."""
+    gamma_abs = np.abs(gamma)
+    return_loss = np.where(gamma_abs == 0, np.inf, -20 * np.log10(gamma_abs))
+    return np.clip(return_loss, -60, 100)  # Verhindert Inf in Plots
 
-        ttk.Label(self.zoom_frame, text="Zoom (Hz):").grid(row=0, column=0, padx=5)
-        self.zoom_start = ttk.Entry(self.zoom_frame, width=8)
-        self.zoom_start.grid(row=0, column=1, padx=5)
-        self.zoom_start.insert(0, '0')
+# =================================================================
+# 3. Interaktive Plot-Funktionen
+# =================================================================
+def plot_smith_chart(ax, Z0):
+    """Smith-Chart mit Grid und Perfect-Match-Marker"""
+    theta = np.linspace(0, 2*np.pi, 1000)
+    ax.plot(np.cos(theta), np.sin(theta), 'k--', lw=1)  # Einheitskreis
+    
+    # Perfect Match (Γ=0)
+    ax.scatter(0, 0, c='g', s=100, zorder=5, marker='*')
+    ax.text(0, 0, 'Perfect\nMatch', c='g', zorder=6, ha='right', va='center')
+    
+    # Konstante R_norm-Grid (subtler)
+    R_norm_vals = np.concatenate([np.arange(0, 2, 0.5), np.arange(2.5, 10, 0.5), [10]])
+    for R_norm in R_norm_vals:
+        X_norm = np.linspace(-10, 10, 1000)
+        Z_norm = R_norm + 1j*X_norm
+        gamma = (Z_norm - 1)/(Z_norm + 1)
+        ax.plot(gamma.real, gamma.imag, 'gray', ls='-', lw=0.5, alpha=0.5)
+    
+    # Konstante X_norm-Grid (subtler)
+    X_norm_vals = np.arange(-10, 10.1, 0.5)
+    for X_norm in X_norm_vals:
+        R_norm = np.linspace(0, 10, 1000)
+        Z_norm = R_norm + 1j*X_norm
+        gamma = (Z_norm - 1)/(Z_norm + 1)
+        ax.plot(gamma.real, gamma.imag, 'gray', ls='-', lw=0.5, alpha=0.5)
+    
+    ax.set_xlabel('Re(Γ)'), ax.set_ylabel('Im(Γ)')
+    ax.set_title(f'Smith Chart (Z0={Z0} Ω)'), ax.grid(False)
+    ax.set_xlim(-1.2, 1.2), ax.set_ylim(-1.2, 1.2), ax.set_aspect('equal')
 
-        self.zoom_end = ttk.Entry(self.zoom_frame, width=8)
-        self.zoom_end.grid(row=0, column=2, padx=5)
-        self.zoom_end.insert(0, '22050')
+def plot_return_loss(ax, f, gamma_total, gamma_ant, Z0):
+    """Return-Loss-Spektrum mit Anmerkungen zum besten Match"""
+    rl_total = compute_return_loss(gamma_total)
+    rl_ant = compute_return_loss(gamma_ant)
+    
+    ax.plot(f/1e6, rl_total, 'r', lw=2, label='Mit Netzwerk')
+    ax.plot(f/1e6, rl_ant, 'b--', lw=1.5, label='Ohne Netzwerk')
+    
+    # Bestes RL (mit Netzwerk)
+    best_idx = np.argmax(rl_total)
+    ax.scatter(f[best_idx]/1e6, rl_total[best_idx], c='g', s=80, zorder=3)
+    ax.text(f[best_idx]/1e6, rl_total[best_idx], 
+            f'Best RL: {rl_total[best_idx]:.1f} dB\nf={f[best_idx]/1e6:.2f} MHz', 
+            c='g', va='bottom', ha='center', fontsize=10)
+    
+    # Bestes RL (Antenne allein)
+    best_idx_ant = np.argmax(rl_ant)
+    ax.scatter(f[best_idx_ant]/1e6, rl_ant[best_idx_ant], c='orange', s=80, zorder=3)
+    ax.text(f[best_idx_ant]/1e6, rl_ant[best_idx_ant], 
+            f'Antenne RL: {rl_ant[best_idx_ant]:.1f} dB\nf={f[best_idx_ant]/1e6:.2f} MHz', 
+            c='orange', va='bottom', ha='center', fontsize=10)
+    
+    ax.set_xlabel('Frequenz (MHz)'), ax.set_ylabel('Return Loss (dB)')
+    ax.set_title('Return Loss Spectrum'), ax.set_ylim(-60, 80)
+    ax.grid(ls='--', alpha=0.6), ax.legend()
 
-        self.zoom_btn = ttk.Button(self.zoom_frame, text="Zoom", command=self.zoom_spectrum)
-        self.zoom_btn.grid(row=0, column=3, padx=5)
+def plot_normalized_impedance(ax, f, Z_total, Z_ant, Z0):
+    """Plot von R/Z0 und X/Z0-Komponenten"""
+    Z_total_norm = Z_total / Z0
+    Z_ant_norm = Z_ant / Z0
+    
+    ax.plot(f/1e6, Z_ant_norm.real, 'b--', lw=1.5, label='Antenne R/Z0')
+    ax.plot(f/1e6, Z_total_norm.real, 'g', lw=2, label='Gesamt R/Z0')
+    ax.plot(f/1e6, Z_ant_norm.imag, 'r--', lw=1.5, label='Antenne X/Z0')
+    ax.plot(f/1e6, Z_total_norm.imag, 'purple', lw=2, label='Gesamt X/Z0')
+    
+    ax.axhline(1, c='k', ls=':', lw=1, label='Perfect R/Z0')  # R/Z0=1
+    ax.axhline(0, c='k', ls=':', lw=1, label='Perfect X/Z0')  # X/Z0=0
+    ax.set_xlabel('Frequenz (MHz)'), ax.set_ylabel('Normierte Impedanz')
+    ax.set_title('Normierte Impedanz-Komponenten (R/Z0, X/Z0)')
+    ax.grid(ls='--', alpha=0.6), ax.legend()
 
-        # Messbereich-Einstellungen
-        self.measure_frame = ttk.Frame(self.root)
-        self.measure_frame.pack(padx=10, pady=5, fill='x')
+def update_plots(f_min, f_max, num_f_points, Z0,
+                network_type,
+                L_L_series, L_C_shunt, L1_pi_t, L2_pi_t,
+                C_C_shunt, C_pi_t,
+                R_ant, L_ant_muH, C_ant_nF, X0):
+    """Hauptfunktion zur Simulation und interaktiven Visualisierung"""
+    # Parameterkonvertierung (µH/nF → H/F)
+    L_series = L_L_series * 1e-6
+    L_shunt = L_C_shunt * 1e-6
+    L1 = L1_pi_t * 1e-6
+    L2 = L2_pi_t * 1e-6
+    C_shunt = C_C_shunt * 1e-9
+    C_pi_t = C_pi_t * 1e-9
+    L_ant = L_ant_muH * 1e-6
+    C_ant = C_ant_nF * 1e-9
 
-        ttk.Label(self.measure_frame, text="Messbereich (Hz):").grid(row=0, column=0, padx=5)
-        self.measure_start = ttk.Entry(self.measure_frame, width=8)
-        self.measure_start.grid(row=0, column=1, padx=5)
-        self.measure_start.insert(0, '0')
+    # Frequenzvektor generieren
+    f_hz = np.linspace(f_min * 1e6, f_max * 1e6, num_f_points)
+    
+    # Roh-Antennenimpedanz (ohne Netzwerk)
+    Z_ant = compute_antenna_impedance(f_hz, R_ant, L_ant, C_ant, X0)
+    gamma_ant = compute_gamma(Z_ant, Z0)
+    
+    # Transformiere mit gewähltem Netzwerk
+    if network_type == 'None':
+        Z_total = Z_ant
+    elif network_type == 'L Network (Series L)':
+        Z_total = series_L_transform(Z_ant, f_hz, L_series)
+    elif network_type == 'C Network (Shunt C)':
+        Z_total = shunt_C_transform(Z_ant, f_hz, C_shunt)
+    elif network_type == 'Series L + Shunt C':
+        Z_total = series_L_shunt_C_transform(Z_ant, f_hz, L_series, C_shunt)
+    elif network_type == 'Shunt L + Series C':
+        Z_total = shunt_L_series_C_transform(Z_ant, f_hz, L_shunt, C_pi_t)
+    elif network_type == 'Pi Network (L1, L2, C)':
+        Z_total = pi_network_transform(Z_ant, f_hz, L1, L2, C_pi_t)
+    elif network_type == 'T Network (L1, L2, C)':
+        Z_total = t_network_transform(Z_ant, f_hz, L1, L2, C_pi_t)
+    else:
+        Z_total = Z_ant
+    
+    # Reflexionskoeffizient nach Netzwerk
+    gamma_total = compute_gamma(Z_total, Z0)
+    
+    # Plot initialisieren
+    fig, (ax_smith, ax_rl, ax_z) = plt.subplots(1, 3, figsize=(24, 8))
+    
+    # Smith-Chart
+    plot_smith_chart(ax_smith, Z0)
+    ax_smith.plot(gamma_ant.real, gamma_ant.imag, 'b--', lw=1.5, label='Antenne (ohne Match)')
+    ax_smith.plot(gamma_total.real, gamma_total.imag, 'r', lw=2, label=f'Netzwerk: {network_type}')
+    ax_smith.legend(fontsize=10)
+    
+    # Return-Loss-Spektrum
+    plot_return_loss(ax_rl, f_hz, gamma_total, gamma_ant, Z0)
+    
+    # Normierte Impedanz
+    plot_normalized_impedance(ax_z, f_hz, Z_total, Z_ant, Z0)
+    
+    plt.tight_layout(), plt.show()
 
-        self.measure_end = ttk.Entry(self.measure_frame, width=8)
-        self.measure_end.grid(row=0, column=2, padx=5)
-        self.measure_end.insert(0, '22050')
-
-        self.measure_btn = ttk.Button(self.measure_frame, 
-                                     text="Measure", 
-                                     command=self.measure_signal)
-        self.measure_btn.grid(row=0, column=3, padx=5)
-
-        self.peak_label = ttk.Label(self.measure_frame, text="Peak dB: ")
-        self.peak_label.grid(row=0, column=4, padx=5)
-
-        self.rms_label = ttk.Label(self.measure_frame, text="RMS dB: ")
-        self.rms_label.grid(row=0, column=5, padx=5)
-
-        # Statusanzeige
-        self.status_frame = ttk.Frame(self.root)
-        self.status_frame.pack(padx=10, pady=5, fill='x')
-        self.status_label = ttk.Label(self.status_frame, textvariable=self.status_var)
-        self.status_label.pack(side='left')
-        self.status_var.set("Bereit.")
-
-        # Plot-Bereich
-        self.plot_frame = ttk.Frame(self.root)
-        self.plot_frame.pack(padx=10, pady=10, fill='both', expand=True)
-        
-        self.fig = plt.Figure(figsize=(8, 6), dpi=100)
-        self.canvas = tkagg.FigureCanvasTkAgg(self.fig, master=self.plot_frame)
-        self.canvas.get_tk_widget().pack(fill='both', expand=True)
-        self.ax = self.fig.add_subplot(111)
-
-        # Klick-Ereignis für Markierungen
-        self.fig.canvas.mpl_connect('button_press_event', self.on_plot_click)
-
-    def update_parameters(self, event=None):
-        # Alt Widget löschen
-        for widget in self.dynamic_params_frame.winfo_children():
-            widget.destroy()
-        
-        self.current_signal_type = self.signal_type.get()
-        # Neue Parameterfelder anlegen
-        if self.current_signal_type == 'Sinus':
-            self.create_sinus_params()
-        elif self.current_signal_type == 'FM-Ton':
-            self.create_fm_params()
-        elif self.current_signal_type == 'LTE-Frame':
-            self.create_lte_params()
-        elif self.current_signal_type == 'WAV-File':
-            self.create_wav_params()
-        else:
-            self.status_var.set("Unbekannter Signaltyp")
-
-    def create_sinus_params(self):
-        # Sinus-Parameter
-        ttk.Label(self.dynamic_params_frame, text="Amplitude:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.sin_amp = ttk.Entry(self.dynamic_params_frame)
-        self.sin_amp.grid(row=0, column=1, padx=5, pady=5)
-        self.sin_amp.insert(0, '1.0')
-
-        ttk.Label(self.dynamic_params_frame, text="Frequenz (Hz):").grid(row=1, column=0, padx=5, pady=5, sticky='w')
-        self.sin_freq = ttk.Entry(self.dynamic_params_frame)
-        self.sin_freq.grid(row=1, column=1, padx=5, pady=5)
-        self.sin_freq.insert(0, '1000')
-
-        ttk.Label(self.dynamic_params_frame, text="Dauer (s):").grid(row=2, column=0, padx=5, pady=5, sticky='w')
-        self.sin_duration = ttk.Entry(self.dynamic_params_frame)
-        self.sin_duration.grid(row=2, column=1, padx=5, pady=5)
-        self.sin_duration.insert(0, '1.0')
-
-        ttk.Label(self.dynamic_params_frame, text="Abtastrate (Hz):").grid(row=3, column=0, padx=5, pady=5, sticky='w')
-        self.sin_fs = ttk.Entry(self.dynamic_params_frame)
-        self.sin_fs.grid(row=3, column=1, padx=5, pady=5)
-        self.sin_fs.insert(0, '44100')
-
-    def create_fm_params(self):
-        # FM-Parameter
-        ttk.Label(self.dynamic_params_frame, text="Amplitude:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.fm_amp = ttk.Entry(self.dynamic_params_frame)
-        self.fm_amp.grid(row=0, column=1, padx=5, pady=5)
-        self.fm_amp.insert(0, '1.0')
-
-        ttk.Label(self.dynamic_params_frame, text="Trägerfrequenz (Hz):").grid(row=1, column=0, padx=5, pady=5, sticky='w')
-        self.fm_fc = ttk.Entry(self.dynamic_params_frame)
-        self.fm_fc.grid(row=1, column=1, padx=5, pady=5)
-        self.fm_fc.insert(0, '10000')
-
-        ttk.Label(self.dynamic_params_frame, text="Modulationsfreq (Hz):").grid(row=2, column=0, padx=5, pady=5, sticky='w')
-        self.fm_fm = ttk.Entry(self.dynamic_params_frame)
-        self.fm_fm.grid(row=2, column=1, padx=5, pady=5)
-        self.fm_fm.insert(0, '1000')
-
-        ttk.Label(self.dynamic_params_frame, text="Modulationsindex (β):").grid(row=3, column=0, padx=5, pady=5, sticky='w')
-        self.fm_beta = ttk.Entry(self.dynamic_params_frame)
-        self.fm_beta.grid(row=3, column=1, padx=5, pady=5)
-        self.fm_beta.insert(0, '1.0')
-
-        ttk.Label(self.dynamic_params_frame, text="Dauer (s):").grid(row=4, column=0, padx=5, pady=5, sticky='w')
-        self.fm_duration = ttk.Entry(self.dynamic_params_frame)
-        self.fm_duration.grid(row=4, column=1, padx=5, pady=5)
-        self.fm_duration.insert(0, '1.0')
-
-        ttk.Label(self.dynamic_params_frame, text="Abtastrate (Hz):").grid(row=5, column=0, padx=5, pady=5, sticky='w')
-        self.fm_fs = ttk.Entry(self.dynamic_params_frame)
-        self.fm_fs.grid(row=5, column=1, padx=5, pady=5)
-        self.fm_fs.insert(0, '44100')
-
-    def create_lte_params(self):
-        # LTE-Parameter
-        ttk.Label(self.dynamic_params_frame, text="Amplitude:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.lte_amp = ttk.Entry(self.dynamic_params_frame)
-        self.lte_amp.grid(row=0, column=1, padx=5, pady=5)
-        self.lte_amp.insert(0, '1.0')
-
-        ttk.Label(self.dynamic_params_frame, text="Trägerfrequenz (Hz):").grid(row=1, column=0, padx=5, pady=5, sticky='w')
-        self.lte_fc = ttk.Entry(self.dynamic_params_frame)
-        self.lte_fc.grid(row=1, column=1, padx=5, pady=5)
-        self.lte_fc.insert(0, '700000000')
-
-        ttk.Label(self.dynamic_params_frame, text="Bandbreite (Hz):").grid(row=2, column=0, padx=5, pady=5, sticky='w')
-        self.lte_bw = ttk.Entry(self.dynamic_params_frame)
-        self.lte_bw.grid(row=2, column=1, padx=5, pady=5)
-        self.lte_bw.insert(0, '10000000')
-
-        ttk.Label(self.dynamic_params_frame, text="Dauer (s):").grid(row=3, column=0, padx=5, pady=5, sticky='w')
-        self.lte_duration = ttk.Entry(self.dynamic_params_frame)
-        self.lte_duration.grid(row=3, column=1, padx=5, pady=5)
-        self.lte_duration.insert(0, '0.001')
-
-        ttk.Label(self.dynamic_params_frame, text="Abtastrate (Hz):").grid(row=4, column=0, padx=5, pady=5, sticky='w')
-        self.lte_fs = ttk.Entry(self.dynamic_params_frame)
-        self.lte_fs.grid(row=4, column=1, padx=5, pady=5)
-        self.lte_fs.insert(0, '20000000')
-
-    def create_wav_params(self):
-        # WAV-Parameter
-        ttk.Label(self.dynamic_params_frame, text="Dateipfad:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.wav_path = ttk.Entry(self.dynamic_params_frame)
-        self.wav_path.grid(row=0, column=1, padx=5, pady=5)
-
-        self.wav_browse = ttk.Button(self.dynamic_params_frame, 
-                                    text="Browse", 
-                                    command=self.browse_wav)
-        self.wav_browse.grid(row=0, column=2, padx=5, pady=5)
-
-    def browse_wav(self):
-        path = filedialog.askopenfilename(filetypes=[("WAV Dateien", "*.wav")])
-        if path:
-            self.wav_path.delete(0, tk.END)
-            self.wav_path.insert(0, path)
-
-    def generate_or_load_signal(self):
-        self.markers = []
-        self.ax.clear()
-        self.canvas.draw()
-        
-        try:
-            if self.current_signal_type == 'Sinus':
-                self.generate_sinus()
-            elif self.current_signal_type == 'FM-Ton':
-                self.generate_fm()
-            elif self.current_signal_type == 'LTE-Frame':
-                self.generate_lte()
-            elif self.current_signal_type == 'WAV-File':
-                self.load_wav()
-            else:
-                self.status_var.set("Signaltyp nicht unterstützt")
-                return
-
-            self.status_var.set("Signal erfolgreich geladen/erzeugt")
-            # Zoom-Einstellungen aktualisieren
-            if self.Fs:
-                self.zoom_end.delete(0, tk.END)
-                self.zoom_end.insert(0, f'{self.Fs/2:.0f}')
-                self.measure_end.delete(0, tk.END)
-                self.measure_end.insert(0, f'{self.Fs/2:.0f}')
-                
-        except Exception as e:
-            self.status_var.set(f"Fehler: {str(e)}")
-
-    def generate_sinus(self):
-        A = float(self.sin_amp.get())
-        f = float(self.sin_freq.get())
-        T = float(self.sin_duration.get())
-        Fs = float(self.sin_fs.get())
-        
-        N = int(Fs * T)
-        self.t = np.linspace(0, T, N, endpoint=False)
-        self.signal = A * np.sin(2 * np.pi * f * self.t)
-        self.Fs = Fs
-
-    def generate_fm(self):
-        A = float(self.fm_amp.get())
-        fc = float(self.fm_fc.get())
-        fm = float(self.fm_fm.get())
-        beta = float(self.fm_beta.get())
-        T = float(self.fm_duration.get())
-        Fs = float(self.fm_fs.get())
-        
-        N = int(Fs * T)
-        self.t = np.linspace(0, T, N, endpoint=False)
-        mod_sig = np.sin(2 * np.pi * fm * self.t)  # Modulationsignal
-        phase = 2 * np.pi * fc * self.t + beta * mod_sig
-        self.signal = A * np.cos(phase)
-        self.Fs = Fs
-
-    def generate_lte(self):
-        A = float(self.lte_amp.get())
-        fc = float(self.lte_fc.get())
-        BW = float(self.lte_bw.get())
-        T = float(self.lte_duration.get())
-        Fs = float(self.lte_fs.get())
-        
-        # Prüfung Abtastrate
-        if Fs <= 2 * BW:
-            raise ValueError(f"Abtastrate {Fs}Hz zu niedrig (min {2*BW}Hz für Basisband)")
-        
-        N = int(Fs * T)
-        self.t = np.linspace(0, T, N, endpoint=False)
-        
-        # Basisband-Signal (Gaußscher Rauschen gefiltert)
-        noise = np.random.normal(0, 1, N)
-        nyq = 0.5 * Fs
-        cutoff = BW / 2
-        b, a = signal.butter(5, cutoff/nyq, 'low')
-        baseband = signal.lfilter(b, a, noise)
-        
-        # Skalierung auf Amplitude A
-        peak = np.max(np.abs(baseband))
-        if peak == 0:
-            baseband_scaled = baseband
-        else:
-            baseband_scaled = baseband * (A / peak)
-        
-        # Auftragen auf Trägerfrequenz
-        self.signal = baseband_scaled * np.cos(2 * np.pi * fc * self.t)
-        self.Fs = Fs
-
-    def load_wav(self):
-        path = self.wav_path.get().strip()
-        if not path:
-            raise ValueError("Kein Dateipfad angegeben")
-        
-        Fs, data = signal.wavfile.read(path)
-        if len(data.shape) > 1:
-            data = data[:, 0]  # Mono-Kanal
-        
-        # Konvertierung in Float
-        data = data.astype(np.float64) / (2**15 - 1)  # Für 16-Bit
-        self.signal = data
-        self.Fs = Fs
-        self.t = np.linspace(0, len(data)/Fs, len(data), endpoint=False)
-
-    def process_fft(self):
-        if self.signal is None or self.Fs is None:
-            return
-        
-        # Fensterung (Hanning) für bessere Spektraleausexy
-        window = np.hanning(len(self.signal))
-        windowed = self.signal * window
-        
-        # FFT berechnen
-        fft_vals = np.fft.fft(windowed)
-        freqs = np.fft.fftfreq(len(fft_vals), 1/self.Fs)
-        freqs_shifted = np.fft.fftshift(freqs)
-        fft_shifted = np.fft.fftshift(fft_vals)
-        
-        # dB-Umrechnung (relativ zum Peak)
-        magnitude = np.abs(fft_shifted)
-        if np.max(magnitude) == 0:
-            db_mag = np.zeros_like(magnitude)
-        else:
-            db_mag = 20 * np.log10(magnitude / np.max(magnitude))
-        
-        # Nur positive Frequenzen betrachten
-        pos_mask = freqs_shifted >= 0
-        self.freqs_positive = freqs_shifted[pos_mask]
-        self.db_magnitude_positive = db_mag[pos_mask]
-        
-        # Resolution Bandwidth (RBW) berechnen
-        self.RBW = self.Fs / len(self.signal)
-
-    def plot_spectrum(self):
-        self.process_fft()
-        if self.freqs_positive is None or self.db_magnitude_positive is None:
-            self.status_var.set("Kein Signal zum Plotten")
-            return
-
-        self.ax.clear()
-        self.ax.plot(self.freqs_positive, self.db_magnitude_positive)
-        self.ax.set_xlabel('Frequenz (Hz)')
-        self.ax.set_ylabel('Amplitude (dB)')
-        self.ax.set_title('Spektrumanalyse')
-        self.ax.set_xlim(0, self.Fs/2)
-        self.ax.autoscale(axis='y', tight=True)
-
-        # Markierungen einblenden
-        for freq in self.markers:
-            idx = np.argmin(np.abs(self.freqs_positive - freq))
-            db = self.db_magnitude_positive[idx]
-            self.ax.axvline(x=freq, color='r', linestyle='--')
-            self.ax.text(freq, self.ax.get_ylim()[1], 
-                        f'{freq:.2f}Hz\n{db:.2f}dB', 
-                        rotation=90, va='top', ha='center', 
-                        color='r', bbox=dict(facecolor='white', alpha=0.8))
-
-        self.canvas.draw()
-
-    def on_plot_click(self, event):
-        if event.inaxes != self.ax:
-            return
-        
-        freq = event.xdata
-        if self.freqs_positive is None or self.db_magnitude_positive is None:
-            return
-        
-        # Näste Frequenz finden
-        idx = np.argmin(np.abs(self.freqs_positive - freq))
-        db = self.db_magnitude_positive[idx]
-        self.markers.append(freq)  # Markierung an Frequenz speichern
-        self.plot_spectrum()  # Plot aktualisieren
-
-    def zoom_spectrum(self):
-        try:
-            f_start = float(self.zoom_start.get())
-            f_end = float(self.zoom_end.get())
-            
-            if f_start >= f_end:
-                raise ValueError("Startfrequenz >= Endfrequenz")
-            
-            max_freq = self.Fs / 2 if self.Fs else 0
-            f_start = max(f_start, 0)
-            f_end = min(f_end, max_freq)
-            
-            self.ax.set_xlim(f_start, f_end)
-            self.canvas.draw()
-        except ValueError as e:
-            self.status_var.set(f"Zoom Fehler: {e}")
-
-    def measure_signal(self):
-        if self.signal is None or self.Fs is None:
-            self.status_var.set("Kein Signal zum Messen")
-            self.peak_label.config(text="Peak dB: -")
-            self.rms_label.config(text="RMS dB: -")
-            return
-
-        try:
-            f_start = float(self.measure_start.get())
-            f_end = float(self.measure_end.get())
-
-            if f_start >= f_end:
-                raise ValueError("Startfrequenz >= Endfrequenz")
-
-            # Bandpass-Filter design
-            nyq = 0.5 * self.Fs
-            low = f_start / nyq
-            high = f_end / nyq
-            b, a = signal.butter(5, [low, high], 'band')
-
-            # Filter anwenden
-            filtered = signal.lfilter(b, a, self.signal)
-
-            # Peak und RMS berechnen
-            peak = np.max(np.abs(filtered))
-            rms = np.sqrt(np.mean(filtered**2))
-
-            # dB-Umrechnung
-            peak_db = 20 * np.log10(peak) if peak > 1e-10 else -np.inf
-            rms_db = 20 * np.log10(rms) if rms > 1e-10 else -np.inf
-
-            self.peak_label.config(text=f"Peak dB: {peak_db:.2f}")
-            self.rms_label.config(text=f"RMS dB: {rms_db:.2f}")
-            self.status_var.set("Messung erfolgreich")
-        except ValueError as e:
-            self.status_var.set(f"Messung Fehler: {e}")
-            self.peak_label.config(text="Peak dB: -")
-            self.rms_label.config(text="RMS dB: -")
-
-def main():
-    root = tk.Tk()
-    app = SpectrumAnalyzerGUI(root)
-    root.mainloop()
-
-if __name__ == "__main__":
-    main()
+# =================================================================
+# 4. Interaktive Widgets (nur in Jupyter Notebook)
+# =================================================================
+interact(
+    update_plots,
+    
+    # Frequenzbereich (MHz)
+    f_min=FloatSlider(min=1, max=100, step=0.5, value=5, description='Min Frequenz:'),
+    f_max=FloatSlider(min=1, max=100, step=0.5, value=20, description='Max Frequenz:'),
+    num_f_points=IntSlider(min=100, max=2000, step=100, value=1000, description='Frequenzpunkte:'),
+    
+    # Referenzimpedanz (Ω)
+    Z0=FloatSlider(min=25, max=100, step=5, value=50, description='Z0:'),
+    
+    # Netzwerk-Typ
+    network_type=Dropdown(
+        options=['None', 'L Network (Series L)', 'C Network (Shunt C)',
+                 'Series L + Shunt C', 'Shunt L + Series C',
+                 'Pi Network (L1, L2, C)', 'T Network (L1, L2, C)'],
+        value='None', description='Netzwerk-Typ:'
+    ),
+    
+    # L-Parameter (µH)
+    L_L_series=FloatSlider(min=0, max=100, step=0.1, value=1, description='Series L:'),
+    L_C_shunt=FloatSlider(min=0, max=100, step=0.1, value=1, description='Shunt L:'),
+    L1_pi_t=FloatSlider(min=0, max=100, step=0.1, value=1, description='Pi/T L1:'),
+    L2_pi_t=FloatSlider(min=0, max=100, step=0.1, value=1, description='Pi/T L2:'),
+    
+    # C-Parameter (nF)
+    C_C_shunt=FloatSlider(min=0, max=100, step=0.1, value=1, description='Shunt C:'),
+    C_pi_t=FloatSlider(min=0, max=100, step=0.1, value=1, description='Pi/T C:'),
+    
+    # Antennenparameter
+    R_ant=FloatSlider(min=10, max=100, step=5, value=50, description='R_ant (Ω):'),
+    L_ant_muH=FloatSlider(min=0, max=100, step=0.1, value=1, description='L_ant (µH):'),
+    C_ant_nF=FloatSlider(min=0, max=100, step=0.1, value=1, description='C_ant (nF):'),
+    X0=FloatSlider(min=-100, max=100, step=1, value=0, description='X0 (Ω):')
+);
