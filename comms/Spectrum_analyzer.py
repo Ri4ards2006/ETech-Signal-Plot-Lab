@@ -277,3 +277,5 @@ interact(
     C_ant_nF=FloatSlider(min=0, max=100, step=0.1, value=1, description='C_ant (nF):'),
     X0=FloatSlider(min=-100, max=100, step=1, value=0, description='X0 (Ω):')
 );
+
+# Hinweis: Diese interaktive Visualisierung ist für Jupyter Notebooks gedacht.
