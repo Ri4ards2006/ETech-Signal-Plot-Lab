@@ -279,3 +279,4 @@ interact(
 );
 
 # Hinweis: Diese interaktive Visualisierung ist für Jupyter Notebooks gedacht.
+# Analyzing the Spectrum diga
