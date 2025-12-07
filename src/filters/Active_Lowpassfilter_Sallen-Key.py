@@ -134,4 +134,4 @@ plt.xlim(0, t.max())
 plt.ylim(0, 1.1)
 plt.tight_layout()
 plt.show()
-// Small rework
+// Small rework.
