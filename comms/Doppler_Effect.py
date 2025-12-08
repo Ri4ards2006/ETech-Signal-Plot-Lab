@@ -1,3 +1,4 @@
+# Simulierung und Plotting Doppler-Effekt
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fft import fft, fftfreq
@@ -16,7 +17,7 @@ def simulate_doppler_effect(f_source, v_observer, v_source, c, duration, sample_
         sample_rate (int): Abtastrate für die Simulation in Hz.
     
     Returns:
-        dict: Enthält Zeitachse, Originalsignal, Doppler-Signal, und Sample-Rate.
+        dict: Enthält Zeitachse, Originalsignal, Doppler-Signal, Sample-Rate und beobachtete Frequenz.
     """
     # Zeitachse generieren (Zeitpunkte in Sekunden)
     t = np.linspace(0, duration, int(sample_rate * duration))
@@ -37,8 +38,9 @@ def simulate_doppler_effect(f_source, v_observer, v_source, c, duration, sample_
         't': t,
         'original_signal': original_signal,
         'doppler_signal': doppler_signal,
-        'sample_rate': sample_rate,  # Hinzugefügt: Sample-Rate für FFT-Berechnung
-        'f_source': f_source         # Optional: Originalfrequenz für Plottaufgaben
+        'sample_rate': sample_rate,
+        'f_source': f_source,
+        'f_observed': f_observed  # Hinzugefügt: Beobachtete Frequenz für Labels
     }
 
 def plot_results(simulation_data):
@@ -47,18 +49,11 @@ def plot_results(simulation_data):
     """
     # Zeitbereich-Plot
     plt.figure(figsize=(12, 6))
-    plt.plot(simulation_data['t'], simulation_data['original_signal'], color="#2c7fb8", linewidth=1.2, label=f'Original (f={simulation_data["f_source"]:.0f} Hz)')
-    plt.plot(simulation_data['t'], simulation_data['doppler_signal'], color="#ff7f0e", linewidth=1.2, linestyle="--", label=f'Doppler (f\'={simulation_data["f_source"]*(simulation_data["t"][-1"]?) No, wait: Berechne f_observed direkt hier.')
+    plt.plot(simulation_data['t'], simulation_data['original_signal'], color="#2c7fb8", linewidth=1.2, 
+             label=f'Original (f=${simulation_data["f_source"]:.0f}$ Hz)')
+    plt.plot(simulation_data['t'], simulation_data['doppler_signal'], color="#ff7f0e", linewidth=1.2, linestyle="--", 
+             label=f'Doppler (f\'=${simulation_data["f_observed"]:.0f}$ Hz)')
     
-    # Korrektur: f_observed aus simulation_data berechnen (oder in simulate_doppler_effect hinzufügen)
-    numerator = simulation_data['sample_rate']? Nein, besser: Rechne f_observed wieder, weil es nicht gespeichert wurde.
-    # Wait, in simulate_doppler_effect haben wir f_observed berechnet, aber sie ist nicht im dictionary. Lass uns sie hinzufügen!
-    # (Um Fehler zu vermeiden, füge f_observed in simulate_doppler_effect hinzu)
-    # Also, korrigiere simulate_doppler_effect, um 'f_observed' zu speichern:
-    # return { ... , 'f_observed': f_observed, ... }
-    
-    # Für den Zeitbereich-Label: Lass uns f_observed berechnen und einfügen
-    f_observed = simulation_data['f_source'] * ( (simulation_data.get('c', 343) + simulation_data.get('v_observer', 0)) / (simulation_data.get('c', 343) + simulation_data.get('v_source', 0)) )
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.title('Zeitbereich: Original vs. Beobachtetes Signal', fontsize=14, pad=20)
@@ -67,28 +62,22 @@ def plot_results(simulation_data):
     plt.show()
     
     # Frequenzbereich-Plot (FFT)
-    # Originalsignal FFT
     original_fft = fft(simulation_data['original_signal'])
-    # Doppler-Signal FFT
     doppler_fft = fft(simulation_data['doppler_signal'])
     
-    # Frequenzen basierend auf Sample-Rate berechnen
-    # Sample-Rate ist jetzt im dictionary gespeichert (simulation_data['sample_rate'])
+    # Berechne Frequenzachsen mit FFT-Funktion
     freqs_original = fftfreq(len(simulation_data['original_signal']), 1 / simulation_data['sample_rate'])
     freqs_doppler = fftfreq(len(simulation_data['doppler_signal']), 1 / simulation_data['sample_rate'])
     
-    # Bereinige FFT (nur positive Frequenzen)
-    # Wir können auch die Amplitude normalisieren (dividiere durch Länge des Signals)
     plt.figure(figsize=(12, 6))
-    # Original-Spektrum
-    plt.plot(freqs_original, np.abs(original_fft)/len(simulation_data['original_signal']), color="#2c7fb8", linewidth=1.2, label=f'Original (f={simulation_data["f_source"]:.0f} Hz)')
-    # Doppler-Spektrum
-    plt.plot(freqs_doppler, np.abs(doppler_fft)/len(simulation_data['doppler_signal']), color="#ff7f0e", linewidth=1.2, linestyle="--", label=f'Doppler (f\'={f_observed:.0f} Hz)')
+    # Plot Original-Spektrum
+    plt.plot(freqs_original, np.abs(original_fft)/len(simulation_data['original_signal']), 
+             color="#2c7fb8", linewidth=1.2, label=f'Original (f=${simulation_data["f_source"]:.0f}$ Hz)')
+    # Plot Doppler-Spektrum
+    plt.plot(freqs_doppler, np.abs(doppler_fft)/len(simulation_data['doppler_signal']), 
+             color="#ff7f0e", linewidth=1.2, linestyle="--", label=f'Doppler (f\'=${simulation_data["f_observed"]:.0f}$ Hz)')
     
-    # Begrenze Frequenzbereich auf relevantes Intervall
-    max_freq = simulation_data['f_source'] * 2  # Bis 2*f_source, da Doppler效应对 1kHz bei v_observer=5m/s nicht so stark ist
-    plt.xlim(0, max_freq)
-    
+    plt.xlim(0, simulation_data['f_source'] * 2)
     plt.title('Frequenzbereich: FFT des Original- und Doppler-Signals', fontsize=14, pad=20)
     plt.xlabel('Frequenz (Hz)', fontsize=12)
     plt.ylabel('Amplitude', fontsize=12)
@@ -98,12 +87,12 @@ def plot_results(simulation_data):
 
 # Simulierung mit Beispielwerten
 simulation_data = simulate_doppler_effect(
-    f_source=1000,    # Originalfrequenz (Hz, nicht kHz!)
-    v_observer=5,     # Beobachtergeschwindigkeit (m/s, + naht der Quelle)
-    v_source=0,       # Quellengeschwindigkeit (m/s, 0 = ruhend)
-    c=343,            # Schallgeschwindigkeit in Luft (m/s)
-    duration=2,       # Simulationdauer (s)
-    sample_rate=44100 # Audiosample-Rate (Hz)
+    f_source=1000,    # Originalfrequenz (Hz)
+    v_observer=5,     # Beobachter bewegt sich auf die Quelle zu (+)
+    v_source=0,       # Quelle ist ruhend (0)
+    c=343,            # Schallgeschwindigkeit (m/s)
+    duration=2,       # Simulationsdauer (s)
+    sample_rate=44100 # Abtastrate (Hz)
 )
 
 # Plotte die Ergebnisse
