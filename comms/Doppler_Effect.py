@@ -24,7 +24,6 @@ def simulate_doppler(f_source, v_observer, v_source, c, duration, sample_rate):
     t = np.linspace(0, duration, int(sample_rate * duration))
     
     # Doppler-Formel: Beobachtete Frequenz f'
-    # Achtung: Wenn denominator ~0 (Quelle bewegt sich zu schnell), könnte es zu Unstabilitäten kommen → add epsilon
     denominator = c + v_source if c + v_source != 0 else 1e-9  # Vermeide Division durch 0
     f_observed = f_source * ( (c + v_observer) / denominator )
     
@@ -64,6 +63,8 @@ def simulate_doppler(f_source, v_observer, v_source, c, duration, sample_rate):
         'doppler_fft_mag': doppler_fft_mag,
         'peaks_original': peaks_original,
         'peaks_doppler': peaks_doppler,
+        'v_observer': v_observer,   # Hinzugefügt für Feedback
+        'v_source': v_source        # Hinzugefügt für Feedback
     }
 
 def update_plot(sim_data):
@@ -75,9 +76,16 @@ def update_plot(sim_data):
     ax_time.plot(sim_data['t'], sim_data['original_signal'], color='#2D708E', linewidth=1.5, label='Original')
     ax_time.plot(sim_data['t'], sim_data['doppler_signal'], color='#E67E22', linewidth=1.5, linestyle='--', label='Doppler')
     
-    # Aktuelle Parameter im Zeitbereich anzeigen
-    ax_time.text(0.05, 0.9, f'f_source: {sim_data["f_source"]:.0f} Hz\nv_observer: {sim_data["v_observer"]:.1f} m/s\nv_source: {sim_data["v_source"]:.1f} m/s', 
-                transform=ax_time.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.9))
+    # Aktuelle Parameter im Zeitbereich anzeigen (ohne Konflikte mit Slider-Farben)
+    ax_time.text(0.05, 0.9, 
+                 f'f_source: {sim_data["f_source"]:.0f} Hz\n'
+                 f'v_observer: {sim_data["v_observer"]:.1f} m/s\n'
+                 f'v_source: {sim_data["v_source"]:.1f} m/s\n'
+                 f'Sample-Rate: {sim_data["sample_rate"]:.0f} Hz',
+                 transform=ax_time.transAxes, 
+                 fontsize=10, 
+                 bbox=dict(facecolor='white', alpha=0.9)
+                )
     
     ax_time.set_title('Zeitbereich: Original vs. Doppler-Signal', fontsize=12, pad=15)
     ax_time.set_xlabel('Zeit (s)')
@@ -132,14 +140,6 @@ def on_slider_change(val):
 
     # Simuliere und aktualisiere Plot
     sim_data = simulate_doppler(f_source, v_observer, v_source, c, duration, sample_rate)
-    # Füge Werte zu sim_data hinzu, die nicht in der Funktion berechnet wurden (für Feedback)
-    sim_data.update({
-        'v_observer': v_observer,
-        'v_source': v_source,
-        'c': c,
-        'duration': duration,
-        'sample_rate': sample_rate
-    })
     update_plot(sim_data)
 
 def reset_all(event):
@@ -155,13 +155,6 @@ def reset_all(event):
         INIT_F_SOURCE, INIT_V_OBSERVER, INIT_V_SOURCE, 
         INIT_C, INIT_DURATION, INIT_SAMPLE_RATE
     )
-    initial_data.update({
-        'v_observer': INIT_V_OBSERVER,
-        'v_source': INIT_V_SOURCE,
-        'c': INIT_C,
-        'duration': INIT_DURATION,
-        'sample_rate': INIT_SAMPLE_RATE
-    })
     update_plot(initial_data)
 
 # ---------------------------
@@ -180,7 +173,6 @@ RANGE_V_OBSERVER = (-20, 20)      # m/s (negativ: weg von Quelle)
 RANGE_V_SOURCE = (-20, 20)        # m/s (negativ: naht Beobachter)
 RANGE_DURATION = (1, 5)            # s
 RANGE_SAMPLE_RATE = (1000, 44100)  # Hz
-RANGE_C = (100, 3e8)               # m/s (Schall bis Licht)
 
 # ---------------------------
 # 2. Plot-Setup (Figure & Axes)
@@ -192,7 +184,7 @@ fig.suptitle('Interaktive Doppler-Effekt-Simulation', fontsize=16, y=0.95)
 plt.subplots_adjust(left=0.1, bottom=0.4, right=0.95, top=0.9)
 
 # ---------------------------
-# 3. Slider-Erstellung (Widgets)
+# 3. Slider-Erstellung (Widgets) ▷ Warnungen BEHEBt!
 # ---------------------------
 # Slider für Originalfrequenz (f_source)
 ax_slider_f = plt.axes([0.1, 0.3, 0.8, 0.03])  # x, y, width, height
@@ -202,9 +194,9 @@ slider_f_source = Slider(
     valmin=RANGE_F_SOURCE[0],
     valmax=RANGE_F_SOURCE[1],
     valinit=INIT_F_SOURCE,
-    color='#3498DB',  # Blau
-    valstep=10,
-    facecolor='#E3F2FD'  # Hintergrundfarbe für Slider
+    valcolor='#3498DB',  # Knob-Farbe (statt 'color')
+    facecolor='#E3F2FD',  # Track-Hintergrundfarbe (statt 'color')
+    valstep=10
 )
 
 # Slider für Beobachtergeschwindigkeit (v_observer)
@@ -215,9 +207,9 @@ slider_v_observer = Slider(
     valmin=RANGE_V_OBSERVER[0],
     valmax=RANGE_V_OBSERVER[1],
     valinit=INIT_V_OBSERVER,
-    color='#2ECC71',  # Grün
-    valstep=0.5,
-    facecolor='#F0FFF0'  # Hellgrün für Slider-Hintergrund
+    valcolor='#2ECC71',  # Knob-Farbe
+    facecolor='#F0FFF0',  # Track-Hintergrundfarbe
+    valstep=0.5
 )
 
 # Slider für Quellengeschwindigkeit (v_source)
@@ -228,9 +220,9 @@ slider_v_source = Slider(
     valmin=RANGE_V_SOURCE[0],
     valmax=RANGE_V_SOURCE[1],
     valinit=INIT_V_SOURCE,
-    color='#E74C3C',  # Rot
-    valstep=0.5,
-    facecolor='#FFF0F5'  # Hellrot für Slider-Hintergrund
+    valcolor='#E74C3C',  # Knob-Farbe
+    facecolor='#FFF0F5',  # Track-Hintergrundfarbe
+    valstep=0.5
 )
 
 # Slider für Simulationsdauer (duration)
@@ -241,9 +233,9 @@ slider_duration = Slider(
     valmin=RANGE_DURATION[0],
     valmax=RANGE_DURATION[1],
     valinit=INIT_DURATION,
-    color='#F1C40F',  # Gelb
-    valstep=0.5,
-    facecolor='#FFF8E7'  # Hellgelb für Slider-Hintergrund
+    valcolor='#F1C40F',  # Knob-Farbe
+    facecolor='#FFF8E7',  # Track-Hintergrundfarbe
+    valstep=0.5
 )
 
 # Slider für Sample-Rate (sample_rate)
@@ -254,37 +246,34 @@ slider_sample_rate = Slider(
     valmin=RANGE_SAMPLE_RATE[0],
     valmax=RANGE_SAMPLE_RATE[1],
     valinit=INIT_SAMPLE_RATE,
-    color='#9B59B6',  # Lila
-    valstep=100,
-    facecolor='#E6E6FA'  # Lavendelfarben für Slider-Hintergrund
+    valcolor='#9B59B6',  # Knob-Farbe
+    facecolor='#E6E6FA',  # Track-Hintergrundfarbe
+    valstep=100
 )
 
-# Reset-Button
+# ---------------------------
+# 4. Reset-Button ▷ TypeError BEHEBt!
+# ---------------------------
 ax_button_reset = plt.axes([0.7, 0.03, 0.2, 0.05])
 reset_button = Button(
     ax=ax_button_reset,
     label='Parameter zurücksetzen',
-    color='#ECF0F1',  # Hellgrau
-    hovercolor='#F5B7B1',
-    fontcolor='#2C3E50'
+    color='#ECF0F1',  # Button-Hintergrundfarbe (Normal)
+    hovercolor='#F5B7B1'  # Hintergrund bei Hover
 )
+# Text-Farbe (fontcolor) manuell setzen (statt 'fontcolor' im Konstruktor)
+reset_button.label.set_color('#2C3E50')  # Schriftfarbe
+
 reset_button.on_clicked(reset_all)
 
 # ---------------------------
-# 4. Initialisierung und Start
+# 5. Initialisierung und Start
 # ---------------------------
 # Erstelle Initialdaten und Plot
 initial_data = simulate_doppler(
     INIT_F_SOURCE, INIT_V_OBSERVER, INIT_V_SOURCE, 
     INIT_C, INIT_DURATION, INIT_SAMPLE_RATE
 )
-initial_data.update({
-    'v_observer': INIT_V_OBSERVER,
-    'v_source': INIT_V_SOURCE,
-    'c': INIT_C,
-    'duration': INIT_DURATION,
-    'sample_rate': INIT_SAMPLE_RATE
-})
 update_plot(initial_data)
 
 # Sliders an Callback-Funktion binden
