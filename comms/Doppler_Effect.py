@@ -36,18 +36,16 @@ def simulate_doppler(f_source, v_observer, v_source, c, duration, sample_rate):
         fft_vals = fft(signal)
         fft_mag = np.abs(fft_vals) / len(signal)  # Normalisiere Amplitude
         freqs = fftfreq(len(signal), 1 / sample_rate)
-        # Nur positive Frequenzen behalten
-        pos_mask = freqs > 0
+        pos_mask = freqs > 0  # Nur positive Frequenzen
         return freqs[pos_mask], fft_mag[pos_mask]
     
     freqs_original, original_fft_mag = compute_fft(original, sample_rate)
     freqs_doppler, doppler_fft_mag = compute_fft(doppler, sample_rate)
     
     # Peaks finden (höchste Amplituden)
-    peaks_original, _ = find_peaks(original_fft_mag, height=0.02)  # Niedrigerer Threshold für Sichtbarkeit
+    peaks_original, _ = find_peaks(original_fft_mag, height=0.02)  # Niedrigerer Threshold
     peaks_doppler, _ = find_peaks(doppler_fft_mag, height=0.02)
     
-    # Rückgabe-Dictionary
     return {
         't': t,
         'original_signal': original,
@@ -63,20 +61,20 @@ def simulate_doppler(f_source, v_observer, v_source, c, duration, sample_rate):
         'doppler_fft_mag': doppler_fft_mag,
         'peaks_original': peaks_original,
         'peaks_doppler': peaks_doppler,
-        'v_observer': v_observer,   # Hinzugefügt für Feedback
-        'v_source': v_source        # Hinzugefügt für Feedback
+        'v_observer': v_observer,
+        'v_source': v_source
     }
 
 def update_plot(sim_data):
     """
-    Aktualisiert Plots und zeigt aktuelle Parameter an.
+    Aktualisiert die Zeit- und Frequenzbereich-Plots mit neuen Simulationsdaten.
     """
-    # Zeitbereich-Plot ( oben )
+    # Zeitbereich-Plot (oben)
     ax_time.clear()
     ax_time.plot(sim_data['t'], sim_data['original_signal'], color='#2D708E', linewidth=1.5, label='Original')
     ax_time.plot(sim_data['t'], sim_data['doppler_signal'], color='#E67E22', linewidth=1.5, linestyle='--', label='Doppler')
     
-    # Aktuelle Parameter im Zeitbereich anzeigen (ohne Konflikte mit Slider-Farben)
+    # Aktuelle Parameter im Zeitbereich anzeigen
     ax_time.text(0.05, 0.9, 
                  f'f_source: {sim_data["f_source"]:.0f} Hz\n'
                  f'v_observer: {sim_data["v_observer"]:.1f} m/s\n'
@@ -93,18 +91,16 @@ def update_plot(sim_data):
     ax_time.grid(True, linestyle='--', alpha=0.6, color='#CCCCCC')
     ax_time.legend(loc='upper right', fontsize=9)
     ax_time.set_facecolor('#F8F9FA')  # Weißlicher Hintergrund
-    ax_time.set_xlim(0, sim_data['duration'])  # Zeitachse an Simulationsdauer anpassen
+    ax_time.set_xlim(0, sim_data['duration'])  # Zeitachse anpassen
 
-    # Frequenzbereich-Plot ( unten )
+    # Frequenzbereich-Plot (unten)
     ax_freq.clear()
-    # Original-Spektrum
     ax_freq.plot(sim_data['freqs_original'], sim_data['original_fft_mag'], 
                  color='#2D708E', linewidth=1.2, label=f'Original (f={sim_data["f_source"]:.0f} Hz)')
-    # Doppler-Spektrum
     ax_freq.plot(sim_data['freqs_doppler'], sim_data['doppler_fft_mag'], 
                  color='#E67E22', linewidth=1.2, linestyle='--', label=f'Doppler (f\'={sim_data["f_observed"]:.0f} Hz)')
     
-    # Peaks markieren (nur wenn vorhanden)
+    # Peaks markieren
     if len(sim_data['peaks_original']) > 0:
         peak_freqs_orig = sim_data['freqs_original'][sim_data['peaks_original']]
         ax_freq.scatter(peak_freqs_orig, sim_data['original_fft_mag'][sim_data['peaks_original']], 
@@ -114,7 +110,7 @@ def update_plot(sim_data):
         ax_freq.scatter(peak_freqs_dop, sim_data['doppler_fft_mag'][sim_data['peaks_doppler']], 
                        color='#E67E22', marker='x', s=70, zorder=3, label='Doppler Peak')
     
-    # Frequenzbereich anpassen (max bis 2×f_source, um Peaks zu sehen)
+    # Frequenzbereich anpassen
     ax_freq.set_xlim(0, sim_data['f_source'] * 2)
     ax_freq.set_ylim(0, max(sim_data['original_fft_mag'].max(), sim_data['doppler_fft_mag'].max()) * 1.1)
     
@@ -126,31 +122,31 @@ def update_plot(sim_data):
     ax_freq.set_facecolor('#F8F9FA')  # Gleiches Hintergrunddesign
 
     plt.tight_layout()
-    fig.canvas.draw()  # Schneller Refresh ohne idle
+    fig.canvas.draw()  # Schneller Refresh
 
 def on_slider_change(val):
     """Callback: Simuliere neues Signal und aktualisiere Plot."""
-    # Hole Slider-Werte
+    # Slider-Werte abrufen
     f_source = slider_f_source.val
     v_observer = slider_v_observer.val
     v_source = slider_v_source.val
     duration = slider_duration.val
     sample_rate = int(slider_sample_rate.val)
-    c = 343  # Schallgeschwindigkeit (kann optional via Slider gesteuert werden)
-
-    # Simuliere und aktualisiere Plot
+    c = 343  # Schallgeschwindigkeit (kann via Slider angepasst werden)
+    
+    # Neues Signal simulieren und Plot aktualisieren
     sim_data = simulate_doppler(f_source, v_observer, v_source, c, duration, sample_rate)
     update_plot(sim_data)
 
 def reset_all(event):
     """Callback: Reset Sliders und Plot."""
-    # Reset Sliders zu Startwerten
+    # Sliders auf Startwerte zurücksetzen
     slider_f_source.reset()
     slider_v_observer.reset()
     slider_v_source.reset()
     slider_duration.reset()
     slider_sample_rate.reset()
-    # Simuliere Startdaten und aktualisiere Plot
+    # Startdaten simulieren und Plot aktualisieren
     initial_data = simulate_doppler(
         INIT_F_SOURCE, INIT_V_OBSERVER, INIT_V_SOURCE, 
         INIT_C, INIT_DURATION, INIT_SAMPLE_RATE
@@ -167,10 +163,9 @@ INIT_DURATION = 2         # Simulationsdauer (s)
 INIT_SAMPLE_RATE = 44100  # Sample-Rate (Hz)
 INIT_C = 343              # Übertragungsgeschwindigkeit (m/s, Schall)
 
-# Slider-Bereiche (min, max)
 RANGE_F_SOURCE = (100, 1500)      # Hz
-RANGE_V_OBSERVER = (-20, 20)      # m/s (negativ: weg von Quelle)
-RANGE_V_SOURCE = (-20, 20)        # m/s (negativ: naht Beobachter)
+RANGE_V_OBSERVER = (-20, 20)      # m/s
+RANGE_V_SOURCE = (-20, 20)        # m/s
 RANGE_DURATION = (1, 5)            # s
 RANGE_SAMPLE_RATE = (1000, 44100)  # Hz
 
@@ -179,12 +174,10 @@ RANGE_SAMPLE_RATE = (1000, 44100)  # Hz
 # ---------------------------
 fig, (ax_time, ax_freq) = plt.subplots(2, 1, figsize=(14, 8), facecolor='#FFFFFF')
 fig.suptitle('Interaktive Doppler-Effekt-Simulation', fontsize=16, y=0.95)
-
-# Axes für Widgets Reservation (unter dem Plot)
-plt.subplots_adjust(left=0.1, bottom=0.4, right=0.95, top=0.9)
+plt.subplots_adjust(left=0.1, bottom=0.4, right=0.95, top=0.9)  # Platz für Widgets
 
 # ---------------------------
-# 3. Slider-Erstellung (Widgets) ▷ Warnungen BEHEBt!
+# 3. Slider-Erstellung (Widgets) ▷ FEHLER BEHEBt!
 # ---------------------------
 # Slider für Originalfrequenz (f_source)
 ax_slider_f = plt.axes([0.1, 0.3, 0.8, 0.03])  # x, y, width, height
@@ -194,9 +187,9 @@ slider_f_source = Slider(
     valmin=RANGE_F_SOURCE[0],
     valmax=RANGE_F_SOURCE[1],
     valinit=INIT_F_SOURCE,
-    valcolor='#3498DB',  # Knob-Farbe (statt 'color')
-    facecolor='#E3F2FD',  # Track-Hintergrundfarbe (statt 'color')
-    valstep=10
+    valstep=10,  # Schrittgröße
+    color='#3498DB',  # Farbe des Knopfs (statt 'valcolor')
+    track_color='#E3F2FD'  # Farbe des Tracks (statt 'facecolor')
 )
 
 # Slider für Beobachtergeschwindigkeit (v_observer)
@@ -207,9 +200,9 @@ slider_v_observer = Slider(
     valmin=RANGE_V_OBSERVER[0],
     valmax=RANGE_V_OBSERVER[1],
     valinit=INIT_V_OBSERVER,
-    valcolor='#2ECC71',  # Knob-Farbe
-    facecolor='#F0FFF0',  # Track-Hintergrundfarbe
-    valstep=0.5
+    valstep=0.5,
+    color='#2ECC71',  # Grün für Beobachter-Knopf
+    track_color='#F0FFF0'  # Hellgrün für Track
 )
 
 # Slider für Quellengeschwindigkeit (v_source)
@@ -220,9 +213,9 @@ slider_v_source = Slider(
     valmin=RANGE_V_SOURCE[0],
     valmax=RANGE_V_SOURCE[1],
     valinit=INIT_V_SOURCE,
-    valcolor='#E74C3C',  # Knob-Farbe
-    facecolor='#FFF0F5',  # Track-Hintergrundfarbe
-    valstep=0.5
+    valstep=0.5,
+    color='#E74C3C',  # Rot für Quelle-Knopf
+    track_color='#FFF0F5'  # Hellrot für Track
 )
 
 # Slider für Simulationsdauer (duration)
@@ -233,9 +226,9 @@ slider_duration = Slider(
     valmin=RANGE_DURATION[0],
     valmax=RANGE_DURATION[1],
     valinit=INIT_DURATION,
-    valcolor='#F1C40F',  # Knob-Farbe
-    facecolor='#FFF8E7',  # Track-Hintergrundfarbe
-    valstep=0.5
+    valstep=0.5,
+    color='#F1C40F',  # Gelb für Dauer-Knopf
+    track_color='#FFF8E7'  # Hellgelb für Track
 )
 
 # Slider für Sample-Rate (sample_rate)
@@ -246,30 +239,29 @@ slider_sample_rate = Slider(
     valmin=RANGE_SAMPLE_RATE[0],
     valmax=RANGE_SAMPLE_RATE[1],
     valinit=INIT_SAMPLE_RATE,
-    valcolor='#9B59B6',  # Knob-Farbe
-    facecolor='#E6E6FA',  # Track-Hintergrundfarbe
-    valstep=100
+    valstep=100,
+    color='#9B59B6',  # Lila für Sample-Rate-Knopf
+    track_color='#E6E6FA'  # Lavendelfarben für Track
 )
 
 # ---------------------------
-# 4. Reset-Button ▷ TypeError BEHEBt!
+# 4. Reset-Button (ohne 'fontcolor'-Argument)
 # ---------------------------
 ax_button_reset = plt.axes([0.7, 0.03, 0.2, 0.05])
 reset_button = Button(
     ax=ax_button_reset,
     label='Parameter zurücksetzen',
-    color='#ECF0F1',  # Button-Hintergrundfarbe (Normal)
-    hovercolor='#F5B7B1'  # Hintergrund bei Hover
+    color='#ECF0F1',  # Normal-Background (Hellgrau)
+    hovercolor='#F5B7B1'  # Hover-Background (Orange-Grau)
 )
-# Text-Farbe (fontcolor) manuell setzen (statt 'fontcolor' im Konstruktor)
-reset_button.label.set_color('#2C3E50')  # Schriftfarbe
+# Schriftfarbe manuell setzen
+reset_button.label.set_color('#2C3E50')  # Dunkler Text
 
 reset_button.on_clicked(reset_all)
 
 # ---------------------------
 # 5. Initialisierung und Start
 # ---------------------------
-# Erstelle Initialdaten und Plot
 initial_data = simulate_doppler(
     INIT_F_SOURCE, INIT_V_OBSERVER, INIT_V_SOURCE, 
     INIT_C, INIT_DURATION, INIT_SAMPLE_RATE
