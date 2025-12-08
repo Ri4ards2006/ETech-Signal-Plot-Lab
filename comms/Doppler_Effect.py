@@ -2,78 +2,82 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fft import fft, fftfreq
 
-def simulate_doppler(
-    f_source: float = 1000,    # Originalfrequenz der Quelle (Hz)
-    v_observer: float = 5,    # Beobachtergeschwindigkeit (m/s, + = auf Quelle zu)
-    v_source: float = 0,      # Quellgeschwindigkeit (m/s, + = weg von Beobachter)
-    c: float = 343,           # Schallgeschwindigkeit (m/s)
-    duration: float = 2,      # Signal-Dauer (Sekunden)
-    sample_rate: int = 44100, # Abtastrate (Hz, für Audiodaten realistisch)
-    plot_title: str = "Doppler-Effekt Simulation: Original vs. Beobachtes Signal"
-):
-    # 1. Zeitachse generieren
-    t = np.linspace(0, duration, int(sample_rate * duration))  # Zeit in Sekunden
+def simulate_doppler_effect(f_source, v_observer, v_source, c, duration, sample_rate):
+    """
+    Simuliert den Doppler-Effekt für ein reines Frequenzsignal.
+    Parametrisiere den Beobachter- und Quellenbewegung und betrachte die Frequenzveränderung.
     
-    # 2. Originalsignal (Quelle)
-    original_signal = np.sin(2 * np.pi * f_source * t)  # Amplitude normiert auf 1
+    Args:
+        f_source (float): Originalfrequenz der Quelle in Hz.
+        v_observer (float): Geschwindigkeit des Beobachters in m/s (+ naht der Quelle).
+        v_source (float): Geschwindigkeit der Quelle in m/s (+ entfernt sich vom Beobachter).
+        c (float): Übertragungsgeschwindigkeit (z. B. Schallgeschwindigkeit in m/s).
+        duration (float): Zeitdauer der Simulation in Sekunden.
+        sample_rate (int): Abtastrate für die Simulation in Hz.
     
-    # 3. Doppler-Parameter berechnen
-    # Beobachter naht der Quelle: v_observer + → f' ↑
-    # Quelle naht dem Beobachter: v_source - → f' ↑
-    numerator = c + v_observer  # Zähler: c + v_observer (Beobachterbewegung)
-    denominator = c + v_source  # Nenner: c + v_source (Quellenbewegung)
-    f_observed = f_source * (numerator / denominator)  # Beobachtete Frequenz
+    Returns:
+        dict: Enthält Zeitachse, Originalsignal, und Doppler-effektes Signal.
+    """
+    # Zeitachse generieren (Zeitpunkte in Sekunden)
+    t = np.linspace(0, duration, int(sample_rate * duration))
     
-    # 4. Doppler-beschertes Signal (Beobachter erhält)
-    # Annahme: Quelle bewegt sich gleichmäßig; Signal wird verzerrt basierend auf f_observed
-    # (Hier vereinfacht: Signal wird direkt mit f_observed generiert; realer Fall könnte Verzögerungen beinhalten)
-    doppler_signal = np.sin(2 * np.pi * f_observed * t)
+    # Phaseinkrement berücksichtigt die Bewegung des Beobachters und der Quelle
+    phase_increment = (2 * np.pi * f_source) * ( (v_observer + v_source) / c )  # Formel für Doppler-Phase
+    # Originalsignal (Sinus mit constant Phase-Einkrement)
+    original_signal = np.sin( (2 * np.pi * f_source * t) + phase_increment * t )
     
-    # 5. Frequenzspektra berechnen (FFT)
-    def compute_spectrum(signal, sample_rate):
-        n = len(signal)
-        y_f = fft(signal)
-        y_f_mag = np.abs(y_f) / n  # Amplitude normalisieren
-        freqs = fftfreq(n, 1 / sample_rate)
-        return freqs[:n//2], y_f_mag[:n//2]  # Nur positive Frequenzen
+    # Doppler-effektes Signal (moduliert mit der Bewegung)
+    f_observed = f_source * (c + v_observer) / (c + v_source)
+    doppler_signal = np.sin( 2 * np.pi * f_observed * t )
     
-    freqs_orig, spectrum_orig = compute_spectrum(original_signal, sample_rate)
-    freqs_doppler, spectrum_doppler = compute_spectrum(doppler_signal, sample_rate)
+    return {
+        't': t,
+        'original_signal': original_signal,
+        'doppler_signal': doppler_signal
+    }
+
+def plot_results(simulation_data):
+    """
+    Plotten der originalen und Doppler-effektes Signale im Zeitbereich und deren FFT.
+    """
+    # Zeitbereich-Plot
+    plt.figure(figsize=(12, 6))
+    plt.plot(simulation_data['t'], simulation_data['original_signal'], label='Original')
+    plt.plot(simulation_data['t'], simulation_data['doppler_signal'], label='Doppler')
+    plt.title('Zeitbereich - Original vs. Beobachtetes Signal')
+    plt.xlabel('Zeit (s)')
+    plt.ylabel('Amplitude')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
     
-    # 6. Plot-Einstellungen (cool & schön!)
-    plt.style.use("seaborn-darkgrid")  # Elegantes Design
-    fig, (ax_time, ax_freq) = plt.subplots(2, 1, figsize=(10, 8), sharex=False)
-    fig.suptitle(plot_title, fontsize=16, y=0.95)
+    # FFT für Frequenzspektrum
+    original_fft = fft(simulation_data['original_signal'])
+    doppler_fft = fft(simulation_data['doppler_signal'])
+    freqs_original = fftfreq(len(simulation_data['original_signal']), 1 / simulation_data['sample_rate'])
+    freqs_doppler = fftfreq(len(simulation_data['doppler_signal']), 1 / simulation_data['sample_rate'])
     
-    # Zeitbereich-Plot (oben)
-    ax_time.plot(t, original_signal, color="#2c7fb8", linewidth=1.2, label=f"Original (f={f_source:.0f} Hz)")
-    ax_time.plot(t, doppler_signal, color="#ff7f0e", linewidth=1.2, linestyle="--", label=f"Doppler (f'={f_observed:.0f} Hz)")
-    ax_time.set_title("Zeitbereich: Original vs. Beobachtes Signal", fontsize=14)
-    ax_time.set_xlabel("Zeit (s)", fontsize=12)
-    ax_time.set_ylabel("Amplitude", fontsize=12)
-    ax_time.legend()
-    ax_time.grid(True, alpha=0.5)
-    
-    # Frequenzbereich-Plot (unten)
-    ax_freq.plot(freqs_orig, spectrum_orig, color="#2c7fb8", linewidth=1.2, label="Originalspektrum")
-    ax_freq.plot(freqs_doppler, spectrum_doppler, color="#ff7f0e", linewidth=1.2, linestyle="--", label="Doppler-Spektrum")
-    ax_freq.set_title("Frequenzbereich: FFT des Original- und Doppler-Signals", fontsize=14)
-    ax_freq.set_xlabel("Frequenz (Hz)", fontsize=12)
-    ax_freq.set_ylabel("Amplitude", fontsize=12)
-    ax_freq.legend()
-    ax_freq.grid(True, alpha=0.5)
-    ax_freq.set_xlim(0, 2*f_source)  # Begrenze Frequenzbereich für Klarheit
-    
-    plt.tight_layout()  # Optimiere Layout
+    # Frequenzbereich-Plot
+    plt.figure(figsize=(12, 6))
+    plt.plot(freqs_original, np.abs(original_fft), label='Original')
+    plt.plot(freqs_doppler, np.abs(doppler_fft), label='Doppler')
+    plt.xlim(0, simulation_data['f_source'] * 2)  # Nur positive Frequenzen bis 2*f_source zeigen
+    plt.title('Frequenzbereich - FFT des Original- und Doppler-Signals')
+    plt.xlabel('Frequenz (Hz)')
+    plt.ylabel('Amplitude')
+    plt.legend()
+    plt.grid(True)
     plt.show()
 
-# Beispielaufruf: Beobachter bewegt sich auf 1 kHz-Quelle zu (v_observer=5 m/s, Quelle ruhend)
-simulate_doppler(
-    f_source=1000,
-    v_observer=5,  # Beobachter naht der Quelle (f' steigt)
-    v_source=0,
-    c=343,
-    duration=2,
-    sample_rate=44100,
-    plot_title="Doppler-Effekt: Beobachter auf Quelle zu (v=5 m/s)"
+# Simulierung mit Beispielwerten
+simulation_data = simulate_doppler_effect(
+    f_source=1000,    # Originalfrequenz (kHz)
+    v_observer=5,     # Beobachtergeschwindigkeit (m/s, positiv naht der Quelle)
+    v_source=0,       # Quellengeschwindigkeit (m/s, 0 = ruhend)
+    c=343,            # Schallgeschwindigkeit in Luft (m/s)
+    duration=2,       # Simulationdauer (s)
+    sample_rate=44100 # Audiosample-Rate (Hz)
 )
+
+# Plotte die Ergebnisse
+plot_results(simulation_data)
