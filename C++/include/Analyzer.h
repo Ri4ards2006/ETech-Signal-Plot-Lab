@@ -1,13 +1,9 @@
-//
-// Created by richard on 09.12.25.
-//
-
-#ifndef C___ANALYZER_H
-#define C___ANALYZER_H
-
+#pragma once
+#include <vector>
 
 class Analyzer {
+public:
+    static double mean(const std::vector<double>& data);
+    static double min(const std::vector<double>& data);
+    static double max(const std::vector<double>& data);
 };
-
-
-#endif //C___ANALYZER_H

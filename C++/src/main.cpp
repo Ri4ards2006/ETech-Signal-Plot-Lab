@@ -1,25 +1,26 @@
-/*
-*Input-Signal (Simulation):
-v(t) = sin(t) + noise
-Wir Speichern 1k Samples
- */
-
-
-
-
 #include <iostream>
+#include <cmath>
+#include <cstdlib>
+#include "../include/SignalBuffer.h"
+#include "../include/Analyzer.h"
 
-// TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
+
 int main() {
-    // TIP Press <shortcut actionId="RenameElement"/> when your caret is at the <b>lang</b> variable name to see how CLion can help you rename it.
-    auto lang = "C++";
-    std::cout << "Hello and welcome to " << lang << "!\n";
+    SignalBuffer buffer;
 
-    for (int i = 1; i <= 5; i++) {
-        // TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-        std::cout << "i = " << i << std::endl;
+    // Generiere 100 Samples eines verrauschten Sinus
+    for (int i = 0; i < 100; i++) {
+        double t = i * 0.1;
+        double noise = ((rand() % 200) - 100) / 500.0; // ±0.2
+        double value = std::sin(t) + noise;
+        buffer.addSample(value);
     }
 
+    const auto& samples = buffer.getSamples();
+
+    std::cout << "Mean: " << Analyzer::mean(samples) << "\n";
+    std::cout << "Min:  " << Analyzer::min(samples) << "\n";
+    std::cout << "Max:  " << Analyzer::max(samples) << "\n";
+
     return 0;
-    // TIP See CLion help at <a href="https://www.jetbrains.com/help/clion/">jetbrains.com/help/clion/</a>. Also, you can try interactive lessons for CLion by selecting 'Help | Learn IDE Features' from the main menu.
 }
