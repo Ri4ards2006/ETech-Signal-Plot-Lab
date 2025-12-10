@@ -50,12 +50,12 @@ if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <=
             // UHHHH Schau mich an ich bin besonders und "CoMpLeX" kys
 
             for (int n = 0; n < N; n++) {// ist es damit er alle Samples durchläuft ?
-
-                re += samples[n] * cos(2 * M_PI * n * k / N);
-
-
-
+            double angle = 2 * M_PI * n / N; // Wozu das M eig ???? also ist n/N  = f ???ß
+                re += samples[n] * cos(angle);
+                im -= samples[n] * sin(angle);
             }
+            mag[k] = sqrt(re * re + im* im); // Pythogaros nh ? für den kram aber was zum fick ist mag ????
+            // ich checke nicht alles und viel aber wie ist mein verständnis so eig ??
         }
     }
 
