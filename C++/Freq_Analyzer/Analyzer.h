@@ -48,6 +48,14 @@ if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <=
             // Sag nicht das du hier in Mengenberreich "C" reingehst ...
             // Ich dachte das definite das auf chillig auf jeden macht und nix mit
             // UHHHH Schau mich an ich bin besonders und "CoMpLeX" kys
+
+            for (int n = 0; n < N; n++) {// ist es damit er alle Samples durchläuft ?
+
+                re += samples[n] * cos(2 * M_PI * n * k / N);
+
+
+
+            }
         }
     }
 
