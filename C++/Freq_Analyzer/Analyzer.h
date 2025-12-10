@@ -11,6 +11,14 @@
 #pragma once;
 class Analyzer {
 
+public:
+    /* Also ich deklariere hier eine Statische Methode mit dem output double die die 3 Parametor hat nh ?
+     * Also den vector von Doubles namens Samples und die Samples pro sekunde oder ? und die wird zu f umgerechnet nh?
+     */
+    static double zeroCrossingFreq(const std::vector<double>& samples, double Fs) {
+
+    }
+
 
 
 };
