@@ -11,8 +11,37 @@
 #include <vector>
 #include <cmath>  // Wie kann ich eig nochmal cmath einsehen brah ?
 
-
 class SignalGenerator {
+
+private:
+
+    double Fs;
+    double N;
+    double A;
+    double f;
+
+    // f ist für Frequenz A für Amplitude N für n gleitzahl in mathe und Fs ist für die Samplrate
+    // Die ist im protected drinne denn nur die Vars nutzt die klasse für die berechnung in den späteren methoden
+
+public:
+SignalGenerator(double Fs, double N, double A, double f) // Und hier werden die Attribute der Objekte reingeschmissen ?
+    : Fs(Fs), N(N), A(A), f(f) {} // Ich checke iwie die zeile hier garnicht ist es der output der F oder wie ?
+    // Denn der berreich da drinne ist ja da leer ?????? ich weiß halt header und so und iwie aber er kann doch gefüllt werden
+
+std::vector<double> generateSine() {
+    std::vector<double> samples;  // Hier wird doch ein Vec Erschaffen oder ?
+
+    samples.reserve(N); // Digga hääää sagst du schon da dass er die anzahl n vorhalten soll ?
+}
+
+
+
+
+
+
+
+protected:
+
 
 };
 
