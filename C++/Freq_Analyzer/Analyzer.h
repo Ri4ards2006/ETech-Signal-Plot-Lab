@@ -36,6 +36,13 @@ if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <=
 
 // ----------------------   Jetzt Definite Fourier Transformation ------------------------------
 
+    // Wieso brauch mann für die Prozedur eig nur den einen Vector Parameter wo ist denn f  A oder iwie was anderes ?
+    static std::vector<double> computeDFT(const std::vector<double>& samples) {
+        int N = samples.size();
+
+        std::vector<double> mag(N/2); // Was soll denn jetzt das schon wieder für was steht mag ???? und denn noch /2
+
+    }
 
 };
 
