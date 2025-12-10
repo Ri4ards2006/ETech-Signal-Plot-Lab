@@ -4,6 +4,8 @@
 #ifndef FREQ_ANALYZER_ANALYZER_H
 #define FREQ_ANALYZER_ANALYZER_H
 
+// Was zum f sind eig die 2 Zeilen da drüber ????
+
 class Analyzer {
 };
 
