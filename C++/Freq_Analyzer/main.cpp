@@ -19,6 +19,19 @@ int main() {
     for (int i = 0; i < 20; i++) {
         std::cout << samples[i] << "\n";
     }
+// ab hier gehts mit der Berechnung der 0 Crossing Frequenz
+    int zeroCrossings = 0;
+
+    for (int i = 1; i < samples.size(); i++) {
+        if ((samples[i-1] > 0 && samples[i] <= 0) || (samples[i-1] < 0 && samples[i] >= 0)) {
+            zeroCrossings++;
+        }
+    }
+
+    double estimatedFrequency = (zeroCrossings / 2.0) * (Fs / samples.size());
+    std::cout << "Frequenz: " << estimatedFrequency << " Hz\n";
+
 
     return 0;
 }
+
