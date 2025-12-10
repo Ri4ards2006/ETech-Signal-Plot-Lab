@@ -8,7 +8,7 @@
 
 #include <cmath>
 #include <vector>
-#pragma once;
+#pragma once; // Was zum fick soll denn das ???
 class Analyzer {
 
 public:
@@ -25,18 +25,12 @@ if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <=
 // Drüber gejumped ist damit du halt später das für die berechnung nutze nh ?????  und dann halt das selbe in oder aber halt nur
 // von + in - und das davor war von + in -
     {
-    zeroCrossing ++ ;
-
-
-
-}
-
+    // Dann wird der wert der Variable zero crossing erhöht heißt also wie oft du  die 0 linie überschritte hast
+    zeroCrossing ++ ; // Brah sagt denn wie oft deine Sinus kurve beef gemacht hast
+            }
         }
     }
-
-
-
 };
 
 
-#endif //FREQ_ANALYZER_ANALYZER_H
+#endif //FREQ_ANALYZER_ANALYZER_H  // Was soll den das schon wieder hier eyyyy ????
