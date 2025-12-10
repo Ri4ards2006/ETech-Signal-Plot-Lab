@@ -42,6 +42,13 @@ if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <=
 
         std::vector<double> mag(N/2); // Was soll denn jetzt das schon wieder für was steht mag ???? und denn noch /2
 
+        for (int k = 0; k < N/2; k ++) {
+            double re = 0.0;
+            double im = 0.0; // Wieso wusste die auto ai was zum fick ist mit re und im gemeint ?????
+            // Sag nicht das du hier in Mengenberreich "C" reingehst ...
+            // Ich dachte das definite das auf chillig auf jeden macht und nix mit
+            // UHHHH Schau mich an ich bin besonders und "CoMpLeX" kys
+        }
     }
 
 };
