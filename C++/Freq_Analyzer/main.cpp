@@ -21,4 +21,8 @@ const double Fs = 1000.0; // sampling rate
     auto samples = generator.generateSine();
     // Auto Samples wie funktioniert das eig digga ???
 
+
+
+    double f_est = Analyzer :: zeroCrossingFreq(samples,Fs); // Initierung der f est variable und Zero Cross methode oder iwie so hiilfe
+    std::cout << "Estimated Frequency (Zero Crossing ):"<< f_est ;  // Was ist dieses dieses <<<<<< eig digga
 }
