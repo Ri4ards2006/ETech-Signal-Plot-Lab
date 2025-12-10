@@ -6,7 +6,13 @@
 
 // Was zum f sind eig die 2 Zeilen da drüber ????
 
+#include <cmath>
+#include <vector>
+#pragma once;
 class Analyzer {
+
+
+
 };
 
 
