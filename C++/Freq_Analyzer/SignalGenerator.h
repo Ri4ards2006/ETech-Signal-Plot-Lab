@@ -15,12 +15,12 @@ class SignalGenerator {
 
 private:
 
-    double Fs;
-    double N;
-    double A;
-    double f;
+    double Fs; // Samples per Second
+    double N; // Samples Anzahl
+    double A; // Amplitude
+    double f; // frequency
 
-    // f ist für Frequenz A für Amplitude N für n gleitzahl in mathe und Fs ist für die Samplrate
+    // f ist für Frequenz A für Amplitude N ist für Samples  in mathe und Fs ist für die Samplrate pro sekunde
     // Die ist im protected drinne denn nur die Vars nutzt die klasse für die berechnung in den späteren methoden
 
 public:
@@ -33,6 +33,7 @@ std::vector<double> generateSine() {
     samples.reserve(N); // Digga hääää sagst du schon da dass er die anzahl n vorhalten soll ?
 
 for (int n = 0; n < N; n++) { // ich checke die bedingung nicht so ganz tbh... also wenn die gleitzahl n größer als die Anzahl der Samples ist ?
+    // Itteriere ich einf sozusagen die anzahl an Samples
     double x = A * sin(2 * M_PI * n / Fs);
         samples.push_back(x);
 }
