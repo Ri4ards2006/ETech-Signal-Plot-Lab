@@ -57,6 +57,7 @@ if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <=
             mag[k] = sqrt(re * re + im* im); // Pythogaros nh ? für den kram aber was zum fick ist mag ????
             // ich checke nicht alles und viel aber wie ist mein verständnis so eig ??
         }
+        return mag; // WAS IST MAG ??? BIG MAC ??
     }
 
 };
