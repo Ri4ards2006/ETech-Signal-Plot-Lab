@@ -12,6 +12,13 @@ const double Fs = 1000.0; // sampling rate
     const double f = 50.0; // Frequenz
 
 
-    SignalGenerator generator(Fs, N, A, f);
+    SignalGenerator generator(Fs, N, A, f); //  Initierung des Signal Generator objekts oder ????ßßßß
+
+
+    // Wählen zwischen Sinus oder Square Signalen
+
+
+    auto samples = generator.generateSine();
+    // Auto Samples wie funktioniert das eig digga ???
 
 }
