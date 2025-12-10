@@ -30,8 +30,13 @@ SignalGenerator(double Fs, double N, double A, double f) // Und hier werden die 
 
 std::vector<double> generateSine() {
     std::vector<double> samples;  // Hier wird doch ein Vec Erschaffen oder ?
-
     samples.reserve(N); // Digga hääää sagst du schon da dass er die anzahl n vorhalten soll ?
+
+for (int n = 0; n < N; n++) { // ich checke die bedingung nicht so ganz tbh... also wenn die gleitzahl n größer als die Anzahl der Samples ist ?
+    double x = A * sin(2 * M_PI * n / Fs);
+        samples.push_back(x);
+}
+return samples;
 }
 
 
