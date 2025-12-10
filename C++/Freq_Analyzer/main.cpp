@@ -1,24 +1,36 @@
-#include <iostream>
-#include <vector>
-#include <cmath>
+# include <iostream>
+# include "SignalGenerator.h"
+#include "Analyzer.h"  // Wieso eig mit "" weil ich die erstellt habe ???? sehr diskriminant digga, was ist fstream
+
 
 int main() {
-    const double Fs = 1000.0; // Sampling-Rate 1000 Hz
-    const double f = 50.0;    // Signal-Frequenz 50 Hz
-    const double A = 1.0;     // Amplitude
-    const int N = 1000;       // Anzahl Samples
 
-    std::vector<double> samples;
-    samples.reserve(N);
+    // Variables -------------------
+const double Fs = 1000.0; // sampling rate
+    const int N = 1000; // Samples
+    const double A = 1.4; // Amplitude
+    const double f = 50.0; // Frequenz
 
-    for (int n = 0; n < N; n++) {
-        double x = A * sin(2.0 * M_PI * f * n / Fs);
-        samples.push_back(x);
-    }
 
-    for (int i = 0; i < 20; i++) {
-        std::cout << samples[i] << "\n";
-    }
+    SignalGenerator generator(Fs, N, A, f); //  Initierung des Signal Generator objekts oder ????ßßßß
 
-    return 0;
+
+    // Wählen zwischen Sinus oder Square Signalen
+
+
+    auto samples = generator.generateSine();
+    // Auto Samples wie funktioniert das eig digga ???
+
+
+
+    double f_est = Analyzer :: zeroCrossingFreq(samples,Fs); // Initierung der f est variable und Zero Cross methode oder iwie so hiilfe
+    std::cout << "Estimated Frequency (Zero Crossing ):"<< f_est ;  // Was ist dieses dieses <<<<<< eig digga
+
+auto spectrum = Analyzer :: computeDFT(samples); // Nur der vec aufruf der deklarierten methode computeDFT vom header  vom Analyzer
+ for (size_t k = 0; k < 20; k++) { // Wie viele und wie genau oder ???
+double freq = k* Fs/ N ; // für Omega oder ?
+     std::cout << "f=" << freq << "Hz, Magnitude" << spectrum[k] << "\n"; // Digga warum << statt + ?????????ßß
+ }
+    return 0; // ist gut nh wie die chance wie ka kys
 }
+

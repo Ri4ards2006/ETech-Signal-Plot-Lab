@@ -1,0 +1,57 @@
+//
+// Created by richard on 10.12.25.
+//
+
+#ifndef FREQ_ANALYZER_SIGNALGENERATOR_H
+#define FREQ_ANALYZER_SIGNALGENERATOR_H
+//-_----------------------------- brAH ES GEHT LOS
+// HEADER FILE (BALD KRIEGE ICH AUCH EINE KUGEL IN MEIN HEAD)
+
+#pragma once  // Was zum dick heißt das pragma ? Dota 2 Klasse ?
+#include <vector>
+#include <cmath>  // Wie kann ich eig nochmal cmath einsehen brah ?
+
+class SignalGenerator {
+
+private:
+
+    double Fs; // Samples per Second
+    double N; // Samples Anzahl
+    double A; // Amplitude
+    double f; // frequency
+
+    // f ist für Frequenz A für Amplitude N ist für Samples  in mathe und Fs ist für die Samplrate pro sekunde
+    // Die ist im protected drinne denn nur die Vars nutzt die klasse für die berechnung in den späteren methoden
+
+public:
+SignalGenerator(double Fs, double N, double A, double f) // Und hier werden die Attribute der Objekte reingeschmissen ?
+    : Fs(Fs), N(N), A(A), f(f) {} // Ich checke iwie die zeile hier garnicht ist es der output der F oder wie ?
+    // Denn der berreich da drinne ist ja da leer ?????? ich weiß halt header und so und iwie aber er kann doch gefüllt werden
+
+std::vector<double> generateSine() {
+    std::vector<double> samples;  // Hier wird doch ein Vec Erschaffen oder ?
+    samples.reserve(N); // Digga hääää sagst du schon da dass er die anzahl n vorhalten soll ?
+// was macht die methode reserve eig so genau ich checks nicht
+for (int n = 0; n < N; n++) { // ich checke die bedingung nicht so ganz tbh... also wenn die gleitzahl n größer als die Anzahl der Samples ist ?
+    // Itteriere ich einf sozusagen die anzahl an Samples
+    double x = A * sin(2 * M_PI * n / Fs); // und hier hab ich die variable X die den wert = Amplitude mall den Sinus hat nh ?
+    // und dann halt mall Omega also w die kreis f  aber tf machst du n / Fs ???? was hat die bit rate mit zu tun ?????
+    // Achsooooo f ist ja das gegenstück davon und so kriegst du f oder ?
+        samples.push_back(x); // was ist die methode push back x ?? wandert die einen weiter in der liste oder wie genau
+}
+return samples; // Und dann gebe ich den vektor aus nh
+}
+
+
+
+
+
+
+
+protected:
+
+
+};
+
+
+#endif //FREQ_ANALYZER_SIGNALGENERATOR_H
