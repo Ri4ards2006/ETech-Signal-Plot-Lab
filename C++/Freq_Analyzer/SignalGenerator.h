@@ -31,13 +31,15 @@ SignalGenerator(double Fs, double N, double A, double f) // Und hier werden die 
 std::vector<double> generateSine() {
     std::vector<double> samples;  // Hier wird doch ein Vec Erschaffen oder ?
     samples.reserve(N); // Digga hääää sagst du schon da dass er die anzahl n vorhalten soll ?
-
+// was macht die methode reserve eig so genau ich checks nicht
 for (int n = 0; n < N; n++) { // ich checke die bedingung nicht so ganz tbh... also wenn die gleitzahl n größer als die Anzahl der Samples ist ?
     // Itteriere ich einf sozusagen die anzahl an Samples
-    double x = A * sin(2 * M_PI * n / Fs);
-        samples.push_back(x);
+    double x = A * sin(2 * M_PI * n / Fs); // und hier hab ich die variable X die den wert = Amplitude mall den Sinus hat nh ?
+    // und dann halt mall Omega also w die kreis f  aber tf machst du n / Fs ???? was hat die bit rate mit zu tun ?????
+    // Achsooooo f ist ja das gegenstück davon und so kriegst du f oder ?
+        samples.push_back(x); // was ist die methode push back x ?? wandert die einen weiter in der liste oder wie genau
 }
-return samples;
+return samples; // Und dann gebe ich den vektor aus nh
 }
 
 
