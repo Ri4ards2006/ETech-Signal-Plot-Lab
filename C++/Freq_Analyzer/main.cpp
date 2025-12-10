@@ -1,16 +1,24 @@
 #include <iostream>
+#include <vector>
+#include <cmath>
 
-// TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 int main() {
-    // TIP Press <shortcut actionId="RenameElement"/> when your caret is at the <b>lang</b> variable name to see how CLion can help you rename it.
-    auto lang = "C++";
-    std::cout << "Hello and welcome to " << lang << "!\n";
+    const double Fs = 1000.0; // Sampling-Rate 1000 Hz
+    const double f = 50.0;    // Signal-Frequenz 50 Hz
+    const double A = 1.0;     // Amplitude
+    const int N = 1000;       // Anzahl Samples
 
-    for (int i = 1; i <= 5; i++) {
-        // TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-        std::cout << "i = " << i << std::endl;
+    std::vector<double> samples;
+    samples.reserve(N);
+
+    for (int n = 0; n < N; n++) {
+        double x = A * sin(2.0 * M_PI * f * n / Fs);
+        samples.push_back(x);
+    }
+
+    for (int i = 0; i < 20; i++) {
+        std::cout << samples[i] << "\n";
     }
 
     return 0;
-    // TIP See CLion help at <a href="https://www.jetbrains.com/help/clion/">jetbrains.com/help/clion/</a>. Also, you can try interactive lessons for CLion by selecting 'Help | Learn IDE Features' from the main menu.
 }
