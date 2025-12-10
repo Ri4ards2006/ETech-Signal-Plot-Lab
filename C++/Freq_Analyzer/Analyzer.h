@@ -29,7 +29,14 @@ if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <=
     zeroCrossing ++ ; // Brah sagt denn wie oft deine Sinus kurve beef gemacht hast
             }
         }
+        return (zeroCrossing * 2.0) * (Fs / samples.size());
+        // Was soll denn die rechnung wieso mach ich es mall 2 ?? wegen der periode oder wie ???  und dann
+        // noch * die Fs durch sample size methode eyyy so strange achsooooo ist es f für  omega ??? aber iwie ohne pi ?
     }
+
+// ----------------------   Jetzt Definite Fourier Transformation ------------------------------
+
+
 };
 
 
