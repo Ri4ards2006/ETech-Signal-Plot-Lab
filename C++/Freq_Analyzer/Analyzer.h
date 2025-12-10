@@ -18,8 +18,14 @@ public:
     static double zeroCrossingFreq(const std::vector<double>& samples, double Fs) {
 int zeroCrossing = 0;  // Hier wird die Int Var namens zeroCrossing initiert
         for (size_t i = 1; i < samples.size(); ++i ) { // Ist size_t ei eine var oder was genau ich checke es nicht ?
-            // Denn dann wird sie
-if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <= 0)) {
+            // Denn dann wird sie iwie als eine fucking methode verwendet es verwirrt mich total tbh
+if ((samples[i-1] < 0 && samples[i] >= 0 ) || (samples[i-1] > 0 && samples[i] <= 0))
+// und hier kommt der fette und ficke batz von wenn in dem vec namens samples die bedingung das wenn [i-1]  kleiner als 0 ist
+// und gleiczeitig der jetzige sample denn du hast größer oder gleich 0 ist eintritt dann weißt du das er über die x achse
+// Drüber gejumped ist damit du halt später das für die berechnung nutze nh ?????  und dann halt das selbe in oder aber halt nur
+// von + in - und das davor war von + in -
+    {
+    zeroCrossing ++ ;
 
 
 
