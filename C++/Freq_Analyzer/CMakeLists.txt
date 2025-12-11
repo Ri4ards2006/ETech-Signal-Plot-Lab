@@ -11,4 +11,6 @@ add_executable(Freq_Analyzer main.cpp
         Timer.cpp
         Timer.h
         ADCBuffer.cpp
-        ADCBuffer.h)
+        ADCBuffer.h
+        cmake-build-debug/PWMController.cpp
+        cmake-build-debug/PWMController.h)

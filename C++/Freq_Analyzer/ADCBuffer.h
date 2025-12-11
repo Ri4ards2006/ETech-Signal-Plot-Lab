@@ -16,13 +16,11 @@ private:
 public:
     void addSample(uint16_t val) /* Was ist dieses val jz ? ist es der name davon es ist so fking komisch */ {
 
-
+buffer[index++] =  val; // Inwiefern ?? ist es denn jz das problem das er den werd um einen erhöht also die variable oder wie
+        // Und warum immer []  es verwirrt mich
+        if (index >= SIZE) index = 0;  // Warum darf mann das ?
     }
-
-
-
-
-
+    uint16_t geSample(int i ){ return buffer[i];}
 };
 
 #endif //FREQ_ANALYZER_ADCBUFFER_H
