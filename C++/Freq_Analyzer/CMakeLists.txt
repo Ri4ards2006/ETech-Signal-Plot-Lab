@@ -9,4 +9,6 @@ add_executable(Freq_Analyzer main.cpp
         Analyzer.cpp
         Analyzer.h
         Timer.cpp
-        Timer.h)
+        Timer.h
+        ADCBuffer.cpp
+        ADCBuffer.h)
