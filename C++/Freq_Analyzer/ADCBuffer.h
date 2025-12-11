@@ -4,6 +4,7 @@
 
 #ifndef FREQ_ANALYZER_ADCBUFFER_H
 #define FREQ_ANALYZER_ADCBUFFER_H
+#include <cstdint>
 
 
 class ADCBuffer {
@@ -12,6 +13,7 @@ private:
     uint16_t buffer[SiZE]; // Was ist der datentyp und ist es jz ein array oder wtf ?????
      int index =0
 };
-
+public:
+void addSample(uint16_t val) // Was ist dieses val jz ? ist es der name davon es ist so fking komisch
 
 #endif //FREQ_ANALYZER_ADCBUFFER_H
