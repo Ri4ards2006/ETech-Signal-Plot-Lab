@@ -7,4 +7,6 @@ add_executable(Freq_Analyzer main.cpp
         SignalGenerator.cpp
         SignalGenerator.h
         Analyzer.cpp
-        Analyzer.h)
+        Analyzer.h
+        Timer.cpp
+        Timer.h)
