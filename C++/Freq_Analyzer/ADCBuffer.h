@@ -26,3 +26,4 @@ buffer[index++] =  val; // Inwiefern ?? ist es denn jz das problem das er den we
 #endif //FREQ_ANALYZER_ADCBUFFER_H
 
 // Mir wurde noch explizit gesagt das es da keine Heap Allocation und keine eigene Header ???
+// heap allocation heißt noch eig  das es einf deterministische Ram belegung ist
