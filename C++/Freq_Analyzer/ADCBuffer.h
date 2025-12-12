@@ -5,6 +5,7 @@
 #ifndef FREQ_ANALYZER_ADCBUFFER_H
 #define FREQ_ANALYZER_ADCBUFFER_H
 #include <cstdint>
+#include <strings.h>
 
 
 class ADCBuffer {
@@ -17,11 +18,16 @@ public:
    static const uint16_t SIZE = 128;
 
     void addSample(uint16_t val) {
-        buffer[index]
+        buffer[index] = val;
+        index = (index + 1) % SIZE;
+    }
+     uint16_t getSample(uint16_t i) const {
+        return buffer[i % SIZE];
     }
 
-
-
+    private:
+    uint16_t buffer[SIZE];
+    uint16_t index = 0;
 
 
 
