@@ -12,6 +12,7 @@ const double Fs = 1000.0; // sampling rate
     const double f = 50.0; // Frequenz
 
 
+
     SignalGenerator generator(Fs, N, A, f); //  Initierung des Signal Generator objekts oder ????ßßßß
 
 

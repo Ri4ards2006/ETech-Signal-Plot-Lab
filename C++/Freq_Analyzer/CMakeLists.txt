@@ -7,4 +7,10 @@ add_executable(Freq_Analyzer main.cpp
         SignalGenerator.cpp
         SignalGenerator.h
         Analyzer.cpp
-        Analyzer.h)
+        Analyzer.h
+        Timer.cpp
+        Timer.h
+        ADCBuffer.cpp
+        ADCBuffer.h
+        cmake-build-debug/PWMController.cpp
+        cmake-build-debug/PWMController.h)
