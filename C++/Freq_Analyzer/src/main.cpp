@@ -1,6 +1,6 @@
 # include <iostream>
-#include "signal/SignalGenerator.h"
-#include "dsp/Analyzer.h"
+#include "../signal/SignalGenerator.h"
+#include "../dsp/Analyzer.h"
 
 
 int main() {
