@@ -20,7 +20,13 @@ class RingBuffer {
     volatile uint16_t head;// Die Schreibposition also der Kopf
     volatile uint16_t tail; // Leseposition
     volatile bool full; // Heißt das nichts optimiert und verbessert wird.
-};
+};  // Volatile ISR Schreibt
+// Main Loop Liest also wird nix vom compiler optimiert
+
+// Constructor :
+ public:
+RingBuffer() : head(0), tail(0), full(false) {}
+// Also jz würde das Objekt halt mit einem Guten Heap management Erzeugt werden
 
 
 #endif //FREQ_ANALYZER_RINGBUFFER_H
