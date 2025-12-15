@@ -13,4 +13,8 @@ add_executable(Freq_Analyzer main.cpp
         hw/ADCBuffer.cpp
         hw/ADCBuffer.h
         cmake-build-debug/PWMController.cpp
-        cmake-build-debug/PWMController.h)
+        cmake-build-debug/PWMController.h
+        dsp/FFT.cpp
+        dsp/FFT.h
+        dsp/Window.cpp
+        dsp/Window.h)
