@@ -17,4 +17,6 @@ add_executable(Freq_Analyzer src/main.cpp
         src/dsp/FFT.cpp
         src/dsp/FFT.h
         src/dsp/Window.cpp
-        src/dsp/Window.h)
+        src/dsp/Window.h
+        src/buffer/RingBuffer.cpp
+        src/buffer/RingBuffer.h)
