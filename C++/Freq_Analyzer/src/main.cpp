@@ -1,6 +1,6 @@
 # include <iostream>
-# include "SignalGenerator.h"
-#include "Analyzer.h"  // Wieso eig mit "" weil ich die erstellt habe ???? sehr diskriminant digga, was ist fstream
+#include "../signal/SignalGenerator.h"
+#include "../dsp/Analyzer.h"
 
 
 int main() {
