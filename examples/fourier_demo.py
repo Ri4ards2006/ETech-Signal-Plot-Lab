@@ -4,12 +4,10 @@
     uv run python -m examples.fourier_demo --save docs/img
 """
 
-import argparse
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 
+from examples._cli import run
 from signal_lab import fourier
 
 
@@ -50,22 +48,5 @@ def make_figures():
     return {"fourier_windows.png": fig1, "fourier_gibbs.png": fig2}
 
 
-def main(save_dir=None):
-    figs = make_figures()
-    if save_dir is None:
-        plt.show()
-        return []
-    out = Path(save_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    paths = []
-    for name, fig in figs.items():
-        fig.savefig(out / name, dpi=110, bbox_inches="tight")
-        plt.close(fig)
-        paths.append(out / name)
-    return paths
-
-
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--save", metavar="DIR", help="write PNGs instead of opening windows")
-    main(ap.parse_args().save)
+    run(make_figures, __doc__)
